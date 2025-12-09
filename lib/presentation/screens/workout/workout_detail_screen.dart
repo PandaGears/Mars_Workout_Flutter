@@ -69,11 +69,32 @@ class _TimerDisplay extends StatelessWidget {
             Text(
               state.currentStage.name,
               style: Theme.of(context).textTheme.headlineMedium,
+              textAlign: TextAlign.center,
             ),
-            const SizedBox(height: 8),
+            if (state.currentStage.details.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.blue.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  state.currentStage.details,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      color: Colors.blue[800],
+                      fontWeight: FontWeight.bold
+                  ),
+                ),
+              ),
+            ],
+            const SizedBox(height: 16),
             Text(
               '$minutes:$seconds',
-              style: Theme.of(context).textTheme.displayLarge?.copyWith(fontWeight: FontWeight.bold),
+              style: Theme.of(context).textTheme.displayLarge?.copyWith(
+                fontWeight: FontWeight.bold,
+                fontFeatures: [const FontFeature.tabularFigures()],
+              ),
             ),
           ],
         );
@@ -81,7 +102,6 @@ class _TimerDisplay extends StatelessWidget {
     );
   }
 }
-
 class _TimerControls extends StatelessWidget {
   const _TimerControls();
 

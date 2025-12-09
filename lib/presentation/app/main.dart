@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:hydrated_bloc/hydrated_bloc.dart';
+import 'package:mars_workout_app/core/theme/app_theme.dart';
 import 'package:mars_workout_app/presentation/screens/home_screen/home_page.dart';
 import 'package:path_provider/path_provider.dart';
 import '../../logic/bloc/plan/plan_bloc.dart';
@@ -24,7 +25,8 @@ class MyApp extends StatelessWidget {
       create: (_) => PlanBloc(),
       child: MaterialApp(
         title: 'Workout Planner',
-        theme: ThemeData(primarySwatch: Colors.blue),
+        darkTheme: AppTheme.lightTheme,
+        theme: AppTheme.lightTheme,
         home: const HomePage(),
         // Define your routes for timer/details here...
       ),
