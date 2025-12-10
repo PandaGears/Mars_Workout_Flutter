@@ -1,11 +1,12 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:mars_workout_app/data/models/workout_model.dart';
+import 'package:mars_workout_app/data/models/workout_model.dart'; //
 import 'package:mars_workout_app/logic/bloc/plan/plan_bloc.dart';
 import 'package:mars_workout_app/logic/bloc/plan/plan_event.dart';
 import 'package:mars_workout_app/logic/bloc/timer/timer_bloc.dart';
 import 'package:mars_workout_app/logic/bloc/timer/timer_event.dart';
-import 'package:mars_workout_app/logic/bloc/timer/timer_state.dart';
+import 'package:mars_workout_app/logic/bloc/timer/timer_state.dart'; //
 
 class WorkoutDetailScreen extends StatelessWidget {
   final Workout workout;
@@ -18,7 +19,13 @@ class WorkoutDetailScreen extends StatelessWidget {
     return BlocProvider(
       create: (context) => TimerBloc(workout.stages),
       child: Scaffold(
-        appBar: AppBar(title: Text(workout.title)),
+        backgroundColor: Colors.white,
+        appBar: AppBar(
+          title: Text(workout.title, style: const TextStyle(color: Colors.black)),
+          backgroundColor: Colors.white,
+          elevation: 0,
+          iconTheme: const IconThemeData(color: Colors.black),
+        ),
         body: BlocListener<TimerBloc, TimerState>(
           listener: (context, state) {
             if (state.isFinished) {
@@ -26,25 +33,55 @@ class WorkoutDetailScreen extends StatelessWidget {
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(content: Text("Workout Completed!")),
               );
-              // Optionally navigate back or show a summary
               Navigator.pop(context);
             }
           },
-          child: SingleChildScrollView(
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Text(workout.description, style: Theme.of(context).textTheme.titleMedium),
-                  const SizedBox(height: 24),
-                  const _TimerDisplay(),
-                  const SizedBox(height: 24),
-                  const _TimerControls(),
-                  const SizedBox(height: 24),
-                  const _StageTracker(),
-                ],
-              ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // 1. Visual Progress of Stages
+                const _StageSegmentBar(),
+                const SizedBox(height: 40),
+
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade50,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.grey.shade200),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.info_outline, color: Colors.blue.shade300, size: 20),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          workout.description, //
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey.shade700,
+                            height: 1.4,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                // 2. Circular Timer
+                const Expanded(child: Center(child: _CircularTimerDisplay())),
+
+                const SizedBox(height: 40),
+
+                // 3. Controls
+                const _TimerControls(),
+                const SizedBox(height: 24),
+
+                // 4. Next Up Text
+                const _StageTracker(),
+              ],
             ),
           ),
         ),
@@ -53,55 +90,120 @@ class WorkoutDetailScreen extends StatelessWidget {
   }
 }
 
-class _TimerDisplay extends StatelessWidget {
-  const _TimerDisplay();
+class _StageSegmentBar extends StatelessWidget {
+  const _StageSegmentBar();
 
   @override
   Widget build(BuildContext context) {
     return BlocBuilder<TimerBloc, TimerState>(
       builder: (context, state) {
-        final duration = state.currentStage.duration - state.elapsed;
-        final minutes = (duration.inSeconds / 60).floor().toString().padLeft(2, '0');
-        final seconds = (duration.inSeconds % 60).toString().padLeft(2, '0');
+        return Row(
+          children: List.generate(state.stages.length, (index) {
+            // Determine color based on completion status
+            Color color;
+            if (index < state.currentStageIndex) {
+              color = Colors.green; // Completed
+            } else if (index == state.currentStageIndex) {
+              color = Colors.blue; // Active
+            } else {
+              color = Colors.grey.shade300; // Upcoming
+            }
 
-        return Column(
-          children: [
-            Text(
-              state.currentStage.name,
-              style: Theme.of(context).textTheme.headlineMedium,
-              textAlign: TextAlign.center,
-            ),
-            if (state.currentStage.details.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            return Expanded(
+              child: Container(
+                margin: const EdgeInsets.symmetric(horizontal: 2),
+                height: 6,
                 decoration: BoxDecoration(
-                  color: Colors.blue.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text(
-                  state.currentStage.details,
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      color: Colors.blue[800],
-                      fontWeight: FontWeight.bold
-                  ),
+                  color: color,
+                  borderRadius: BorderRadius.circular(3),
                 ),
               ),
-            ],
-            const SizedBox(height: 16),
-            Text(
-              '$minutes:$seconds',
-              style: Theme.of(context).textTheme.displayLarge?.copyWith(
-                fontWeight: FontWeight.bold,
-                fontFeatures: [const FontFeature.tabularFigures()],
-              ),
-            ),
-          ],
+            );
+          }),
         );
       },
     );
   }
 }
+
+class _CircularTimerDisplay extends StatelessWidget {
+  const _CircularTimerDisplay();
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocBuilder<TimerBloc, TimerState>(
+      builder: (context, state) {
+        final totalSeconds = state.currentStage.duration.inSeconds; //
+        final elapsedSeconds = state.elapsed.inSeconds; //
+
+        // Calculate progress (1.0 = full, 0.0 = empty)
+        // We want it to "empty" as time goes on, so we do 1 - (elapsed / total)
+        double progress = 1.0;
+        if (totalSeconds > 0) {
+          progress = 1.0 - (elapsedSeconds / totalSeconds);
+        }
+
+        final duration = state.currentStage.duration - state.elapsed;
+        final minutes = (duration.inSeconds / 60).floor().toString().padLeft(2, '0');
+        final seconds = (duration.inSeconds % 60).toString().padLeft(2, '0');
+
+        return SizedBox(
+          width: 280,
+          height: 280,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              // Background Circle (Grey track)
+              CircularProgressIndicator(
+                value: 1.0,
+                strokeWidth: 15,
+                color: Colors.grey.shade100,
+              ),
+              // Progress Circle (Animated)
+              // We rotate it -90 degrees (pi/2) so it starts at the top (12 o'clock)
+              Transform.rotate(
+                angle: -math.pi / 2,
+                child: CircularProgressIndicator(
+                  value: progress,
+                  strokeWidth: 15,
+                  strokeCap: StrokeCap.round, // Rounded ends look nicer
+                  color: progress < 0.2 ? Colors.redAccent : Colors.blueAccent, // Turn red when low
+                  backgroundColor: Colors.transparent,
+                ),
+              ),
+              // Center Text
+              Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    state.currentStage.name.toUpperCase(),
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 1.2,
+                      color: Colors.grey.shade600,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    '$minutes:$seconds',
+                    style: const TextStyle(
+                      fontSize: 60,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.black87,
+                      fontFeatures: [FontFeature.tabularFigures()], // Keeps numbers from jumping width
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
 class _TimerControls extends StatelessWidget {
   const _TimerControls();
 
@@ -112,20 +214,35 @@ class _TimerControls extends StatelessWidget {
         return Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            if (state.isRunning)
-              IconButton(
-                icon: const Icon(Icons.pause, size: 48),
-                onPressed: () => context.read<TimerBloc>().add(PauseTimer()),
-              )
-            else
-              IconButton(
-                icon: const Icon(Icons.play_arrow, size: 48),
-                onPressed: () => context.read<TimerBloc>().add(StartTimer()),
+            // Floating Action Button style for main control
+            FloatingActionButton.large(
+              onPressed: () {
+                if (state.isRunning) {
+                  context.read<TimerBloc>().add(PauseTimer());
+                } else {
+                  context.read<TimerBloc>().add(StartTimer());
+                }
+              },
+              backgroundColor: state.isRunning ? Colors.amber : Colors.blue,
+              child: Icon(
+                state.isRunning ? Icons.pause : Icons.play_arrow,
+                size: 42,
+                color: Colors.white,
               ),
-            const SizedBox(width: 24),
-            IconButton(
-              icon: const Icon(Icons.skip_next, size: 48),
-              onPressed: () => context.read<TimerBloc>().add(NextStage()),
+            ),
+            const SizedBox(width: 32),
+            // Secondary button for skip
+            Container(
+              decoration: BoxDecoration(
+                color: Colors.grey.shade200,
+                shape: BoxShape.circle,
+              ),
+              child: IconButton(
+                iconSize: 32,
+                icon: const Icon(Icons.skip_next_rounded),
+                color: Colors.grey.shade800,
+                onPressed: () => context.read<TimerBloc>().add(NextStage()),
+              ),
             ),
           ],
         );
@@ -141,15 +258,37 @@ class _StageTracker extends StatelessWidget {
   Widget build(BuildContext context) {
     return BlocBuilder<TimerBloc, TimerState>(
       builder: (context, state) {
+        if (state.upcomingStages.isEmpty) {
+          return const Center(
+            child: Text(
+                "Final Stage!",
+                style: TextStyle(color: Colors.grey, fontStyle: FontStyle.italic)
+            ),
+          );
+        }
+
+        // Show only the immediate next stage to keep UI clean
+        final next = state.upcomingStages.first;
+
         return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text("Next Up", style: Theme.of(context).textTheme.titleLarge),
-            const SizedBox(height: 8),
-            ...state.upcomingStages.map((stage) => Text(
-              stage.name,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.grey),
-            )),
+            const Text(
+              "NEXT UP",
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+                color: Colors.grey,
+                letterSpacing: 1.0,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              next.name,
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
           ],
         );
       },

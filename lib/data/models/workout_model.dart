@@ -31,29 +31,29 @@ class Workout extends Equatable {
 
 class WorkoutStage extends Equatable {
   final String name;
-  final String details; // New field for "15 reps", "RPM 90", etc.
   final Duration duration;
+  final String description; // <--- NEW FIELD
 
   const WorkoutStage({
     required this.name,
-    this.details = '',
     required this.duration,
+    this.description = "", // Default to empty if not provided
   });
 
   @override
-  List<Object?> get props => [name, details, duration];
+  List<Object?> get props => [name, duration, description];
 
   Map<String, dynamic> toJson() => {
     'name': name,
-    'details': details,
     'duration': duration.inSeconds,
+    'description': description,
   };
 
   factory WorkoutStage.fromJson(Map<String, dynamic> json) {
     return WorkoutStage(
       name: json['name'],
-      details: json['details'] ?? '',
       duration: Duration(seconds: json['duration']),
+      description: json['description'] ?? "",
     );
   }
 }

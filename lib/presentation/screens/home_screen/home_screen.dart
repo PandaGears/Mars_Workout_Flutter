@@ -9,20 +9,7 @@ class HomeScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(title: const Text("Mars Workout")),
       body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            ElevatedButton(
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const PlanListScreen()),
-                );
-              },
-              child: const Text("Browse Workout Plans"),
-            ),
-          ],
-        ),
+        child: const PlanListScreen(),
       ),
     );
   }
