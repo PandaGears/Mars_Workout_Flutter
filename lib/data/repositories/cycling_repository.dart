@@ -1,5 +1,3 @@
-import 'package:mars_workout_app/core/constants/enums/workout_type.dart';
-
 import '../models/training_plan.dart';
 import '../models/workout_model.dart';
 import 'daily_repository.dart';
@@ -56,14 +54,10 @@ List<Workout> getPowerHourOptions() {
   ];
 }
 
-
-
-
 Workout speedIntervalsWorkout({required bool isShort}) {
   return Workout(
     title: isShort ? 'Speed Intervals (30m)' : 'Speed Intervals (60m)',
     description: 'High-cadence efforts to improve leg speed. Use a comfortable gear and aim for as high a cadence (pedal speed) as possible.',
-    workoutType: WorkoutType.cycling,
     stages: [
       // Warm-up -> Spin Easy
       WorkoutStage(
@@ -103,7 +97,6 @@ Workout ladderIntervalsWorkout({required bool isShort}) {
   return Workout(
     title: isShort ? 'Ladder Intervals (30m)' : 'Ladder Intervals (60m)',
     description: 'Progressively longer intervals. ' 'A very hard pace, just below your maximum. You can only say one or two words at a time.',
-    workoutType: WorkoutType.cycling,
     stages: [
       const WorkoutStage(
           name: 'Warm-up',
@@ -156,7 +149,6 @@ Workout climbingBurstsWorkout({required bool isShort}) {
   return Workout(
     title: isShort ? 'Climbing Bursts (30m)' : 'Climbing Bursts (60m)',
     description: 'Simulated hill attacks. ' 'Increase your gear/resistance, stand up out of the saddle, and attack the ‘climb’.',
-    workoutType: WorkoutType.cycling,
     stages: [
       const WorkoutStage(
           name: 'Warm-up',
@@ -193,7 +185,6 @@ Workout powerHourWorkout() {
   return Workout(
     title: 'Power Hour: Sweet Spot',
     description: 'Sustained effort at 88-93% FTP. Uncomfortably comfortable building resilience.',
-    workoutType: WorkoutType.cycling,
     stages: [
       const WorkoutStage(name: 'Warm-up', duration: Duration(minutes: 10), description: 'Spin Easy: Gradual build.'),
       const WorkoutStage(name: 'Sweet Spot 1', duration: Duration(minutes: 20), description: '80% Effort: Strong, sustainable pace.'),
@@ -209,7 +200,6 @@ Workout powerHourThreshold() {
   return Workout(
     title: 'Power Hour: Threshold',
     description: 'Higher intensity intervals at 100% FTP. Mental toughness required.',
-    workoutType: WorkoutType.cycling,
     stages: [
       const WorkoutStage(name: 'Warm-up', duration: Duration(minutes: 10), description: 'Spin Easy.'),
       const WorkoutStage(name: 'Threshold 1', duration: Duration(minutes: 10), description: '90% Effort: Right below max sustainable.'),
@@ -227,7 +217,6 @@ Workout powerHourSteady() {
   return Workout(
     title: 'Power Hour: Steady State',
     description: 'One long, unbroken effort at moderate intensity (Tempo).',
-    workoutType: WorkoutType.cycling,
     stages: [
       const WorkoutStage(name: 'Warm-up', duration: Duration(minutes: 10), description: 'Spin Easy.'),
       const WorkoutStage(name: 'The Block', duration: Duration(minutes: 45), description: '80% Effort: Do not stop. Find a rhythm and stay there.'),
@@ -239,7 +228,6 @@ Workout sundayRideWorkout() {
   return Workout(
     title: 'Sunday Endurance',
     description: 'A very low-intensity ride to aid recovery and improve base fitness.',
-    workoutType: WorkoutType.cycling,
     stages: [
       const WorkoutStage(
           name: 'Warm-up',

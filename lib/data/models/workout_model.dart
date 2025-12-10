@@ -1,28 +1,23 @@
 import 'package:equatable/equatable.dart';
-import 'package:mars_workout_app/core/constants/enums/workout_type.dart';
 
 class Workout extends Equatable {
   final String title;
   final String description;
   final List<WorkoutStage> stages;
-  final WorkoutType workoutType;
 
   const Workout({
     required this.title,
     required this.description,
     required this.stages,
-    this.workoutType = WorkoutType.other
   });
 
   @override
-  List<Object?> get props => [title, description, stages, workoutType];
+  List<Object?> get props => [title, description, stages];
 
   Map<String, dynamic> toJson() => {
     'title': title,
     'description': description,
     'stages': stages.map((s) => s.toJson()).toList(),
-    'workout_type': workoutType,
-
   };
 
   factory Workout.fromJson(Map<String, dynamic> json) {
@@ -30,7 +25,6 @@ class Workout extends Equatable {
       title: json['title'],
       description: json['description'],
       stages: (json['stages'] as List).map((i) => WorkoutStage.fromJson(i)).toList(),
-      workoutType: json['workout_type'] ?? WorkoutType.other,
     );
   }
 }

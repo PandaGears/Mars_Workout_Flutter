@@ -1,4 +1,5 @@
 import 'package:equatable/equatable.dart';
+import 'package:mars_workout_app/core/constants/enums/workout_type.dart';
 import 'workout_model.dart'; // Import your existing workout model
 
 class TrainingPlan extends Equatable {
@@ -7,6 +8,7 @@ class TrainingPlan extends Equatable {
   final String description;
   final String difficulty;
   final List<PlanWeek> weeks;
+  final WorkoutType workoutType;
 
   const TrainingPlan({
     required this.id,
@@ -14,6 +16,7 @@ class TrainingPlan extends Equatable {
     required this.description,
     required this.difficulty,
     required this.weeks,
+    this.workoutType = WorkoutType.other
   });
 
   // Calculate total progress based on completed workout IDs
@@ -39,6 +42,7 @@ class TrainingPlan extends Equatable {
   Map<String, dynamic> toJson() => {
     'id': id, 'title': title, 'description': description, 'difficulty': difficulty,
     'weeks': weeks.map((w) => w.toJson()).toList(),
+    'workout_type': workoutType,
   };
 
   factory TrainingPlan.fromJson(Map<String, dynamic> json) {
@@ -48,6 +52,7 @@ class TrainingPlan extends Equatable {
       description: json['description'],
       difficulty: json['difficulty'],
       weeks: (json['weeks'] as List).map((i) => PlanWeek.fromJson(i)).toList(),
+      workoutType: json['workout_type'] ?? WorkoutType.other,
     );
   }
 }
@@ -90,7 +95,7 @@ class PlanDay extends Equatable {
     'workout': {
       'title': workout.title,
       'description': workout.description,
-      'stages': workout.stages.map((s) => {'name':s.name, 'duration': s.duration.inSeconds}).toList()
+      'stages': workout.stages.map((s) => {'name':s.name, 'duration': s.duration.inSeconds}).toList(),
     }
   };
 

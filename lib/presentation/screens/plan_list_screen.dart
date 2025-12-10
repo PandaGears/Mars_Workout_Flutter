@@ -1,16 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:mars_workout_app/core/constants/enums/workout_type.dart';
 import 'package:mars_workout_app/data/repositories/workout_repository.dart';
 import 'package:mars_workout_app/logic/bloc/plan/plan_bloc.dart';
 import 'package:mars_workout_app/logic/bloc/plan/plan_state.dart';
 import 'package:mars_workout_app/presentation/screens/details/plan_details.dart';
 
 class PlanListScreen extends StatelessWidget {
-  const PlanListScreen({super.key});
+  final WorkoutType workoutType;
+  const PlanListScreen({super.key, required this.workoutType});
 
   @override
   Widget build(BuildContext context) {
-    final plans = WorkoutRepository().getAllPlans();
+    final plans = WorkoutRepository().getAllPlans().where((workout)=>workout.workoutType == workoutType).toList();
     final theme = Theme.of(context);
 
     return SafeArea(

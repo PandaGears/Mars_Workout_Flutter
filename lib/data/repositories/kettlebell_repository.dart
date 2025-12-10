@@ -1,4 +1,3 @@
-import 'package:mars_workout_app/core/constants/enums/workout_type.dart';
 import 'package:mars_workout_app/data/models/training_plan.dart';
 import 'package:mars_workout_app/data/models/workout_model.dart';
 
@@ -18,7 +17,6 @@ TrainingPlan kettlebellPlan() {
             workout: Workout(
               title: 'Kettlebell Swings & Goblet Squats',
               description: 'Focus on explosive power.',
-              workoutType: WorkoutType.kettleBell,
               stages: [
                 const WorkoutStage(name: 'Warm-up', duration: Duration(minutes: 10), description: 'Halo, Slingshot.'),
                 const WorkoutStage(name: 'Main Circuit', duration: Duration(minutes: 20), description: 'Ladder: 5/5, 10/10.'),
