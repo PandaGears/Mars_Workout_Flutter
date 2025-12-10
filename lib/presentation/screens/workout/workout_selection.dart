@@ -3,14 +3,16 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:mars_workout_app/core/constants/enums/workout_type.dart';
 import 'package:mars_workout_app/data/models/workout_model.dart';
 import 'package:mars_workout_app/logic/bloc/plan/plan_bloc.dart';
+import 'package:mars_workout_app/presentation/screens/individual/workout_preview_screen.dart';
 import 'package:mars_workout_app/presentation/screens/workout/workout_detail_screen.dart';
 
 class WorkoutSelectionScreen extends StatelessWidget {
   final String title;
   final String planDayId;
   final List<Workout> options;
+  final WorkoutType workoutType;
 
-  const WorkoutSelectionScreen({super.key, required this.title, required this.planDayId, required this.options});
+  const WorkoutSelectionScreen({super.key, required this.title, required this.planDayId, required this.options, this.workoutType = WorkoutType.cycling});
 
   @override
   Widget build(BuildContext context) {
@@ -47,7 +49,11 @@ class WorkoutSelectionScreen extends StatelessWidget {
                         MaterialPageRoute(
                           builder: (_) => BlocProvider.value(
                             value: BlocProvider.of<PlanBloc>(context),
-                            child: WorkoutDetailScreen(workout: workout, planDayId: planDayId, workoutType: WorkoutType.cycling,),
+                            child: WorkoutPreviewScreen(
+                              workout: workout, // The specific option selected
+                              planDayId: planDayId,
+                              workoutType: workoutType,
+                            ),
                           ),
                         ),
                       );

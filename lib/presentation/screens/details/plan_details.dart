@@ -8,6 +8,8 @@ import 'package:mars_workout_app/presentation/screens/workout/workout_detail_scr
 import 'package:mars_workout_app/presentation/screens/workout/workout_selection.dart';
 import 'package:mars_workout_app/data/repositories/workouts/workout_repository.dart';
 
+import '../individual/workout_preview_screen.dart';
+
 class PlanDetailScreen extends StatelessWidget {
   final TrainingPlan plan;
 
@@ -160,37 +162,40 @@ class PlanDetailScreen extends StatelessWidget {
                                   ),
                                 ),
                                 onTap: () {
-                                  // Determine Destination
-                                  if (day.title.contains("Choice")) {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (_) => BlocProvider.value(
-                                          value: BlocProvider.of<PlanBloc>(context),
-                                          child: WorkoutSelectionScreen(
-                                            title: day.title,
-                                            planDayId: day.id,
-                                            options: getPowerHourOptions(),
+                                    // 1. CHOICE WORKOUTS (Keep Logic, but update Selection Screen navigation next)
+                                    if (day.title.contains("Choice")) {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) => BlocProvider.value(
+                                            value: BlocProvider.of<PlanBloc>(context),
+                                            child: WorkoutSelectionScreen(
+                                              title: day.title,
+                                              planDayId: day.id,
+                                              options: getPowerHourOptions(),
+                                            ),
                                           ),
                                         ),
-                                      ),
-                                    );
-                                  } else {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (_) => BlocProvider.value(
-                                          value: BlocProvider.of<PlanBloc>(context),
-                                          child: WorkoutDetailScreen(
-                                            workout: day.workout,
-                                            planDayId: day.id,
-                                            workoutType: plan.workoutType,
+                                      );
+                                    }
+                                    // 2. STANDARD WORKOUTS -> GO TO PREVIEW
+                                    else {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) => BlocProvider.value(
+                                            value: BlocProvider.of<PlanBloc>(context),
+                                            // Change this from WorkoutDetailScreen to WorkoutPreviewScreen
+                                            child: WorkoutPreviewScreen(
+                                              workout: day.workout,
+                                              planDayId: day.id,
+                                              workoutType: plan.workoutType,
+                                            ),
                                           ),
                                         ),
-                                      ),
-                                    );
-                                  }
-                                },
+                                      );
+                                    }
+                                  },
                               );
                             }).toList(),
                           ),
