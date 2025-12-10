@@ -105,7 +105,7 @@ class PlanDetailScreen extends StatelessWidget {
                                   MaterialPageRoute(
                                     builder: (_) => BlocProvider.value(
                                       value: BlocProvider.of<PlanBloc>(context),
-                                      child: WorkoutDetailScreen(workout: day.workout, planDayId: day.id),
+                                      child: WorkoutDetailScreen(workout: day.workout, planDayId: day.id, workoutType: plan.workoutType,),
                                     ),
                                   ),
                                 );

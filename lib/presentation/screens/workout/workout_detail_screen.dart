@@ -1,6 +1,7 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:mars_workout_app/core/constants/enums/workout_type.dart';
 import 'package:mars_workout_app/data/models/workout_model.dart';
 import 'package:mars_workout_app/data/repositories/misc/gif_repository.dart';
 import 'package:mars_workout_app/logic/bloc/plan/plan_bloc.dart';
@@ -11,10 +12,11 @@ import 'package:mars_workout_app/logic/bloc/timer/timer_state.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
 class WorkoutDetailScreen extends StatefulWidget {
+  final WorkoutType workoutType;
   final Workout workout;
   final String planDayId;
 
-  const WorkoutDetailScreen({super.key, required this.workout, required this.planDayId});
+  const WorkoutDetailScreen({super.key, required this.workout, required this.planDayId, required this.workoutType});
 
   @override
   State<WorkoutDetailScreen> createState() => _WorkoutDetailScreenState();
@@ -40,14 +42,12 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
     return BlocProvider(
       create: (context) => TimerBloc(widget.workout.stages),
       child: Scaffold(
-        backgroundColor: Colors.white, // Clean background for the GIF
+        backgroundColor: Colors.white,
         appBar: AppBar(
           title: Text(widget.workout.title),
-          backgroundColor: Colors.transparent,
           elevation: 0,
           foregroundColor: Colors.black,
         ),
-        extendBodyBehindAppBar: true, // Allow GIF to go behind App Bar if desired
         body: BlocListener<TimerBloc, TimerState>(
           listener: (context, state) {
             if (state.isFinished) {
@@ -65,7 +65,7 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
                   previous.currentStageIndex != current.currentStageIndex,
                   builder: (context, state) {
                     final gifUrl = GifRepository.getGifUrl(
-                        widget.workout.title,
+                        widget.workoutType,
                         state.currentStage.name
                     );
 
@@ -74,7 +74,7 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
                       color: Colors.grey.shade100,
                       child: Image.network(
                         gifUrl,
-                        fit: BoxFit.cover,
+                        fit: BoxFit.contain,
                         // Add a loading builder for smoother transitions
                         loadingBuilder: (context, child, loadingProgress) {
                           if (loadingProgress == null) return child;
