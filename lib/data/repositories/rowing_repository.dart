@@ -1,6 +1,7 @@
 import 'package:mars_workout_app/data/models/training_plan.dart';
 import 'package:mars_workout_app/data/models/workout_model.dart';
 
+import '../../core/constants/enums/workout_type.dart';
 import 'daily_repository.dart';
 
 TrainingPlan insideIndoorBeginnerPlan() {
@@ -71,6 +72,7 @@ TrainingPlan insideIndoorBeginnerPlan() {
               workout: Workout(
                   title: '4 x 500m',
                   description: 'Medium intensity. Note your time for each 500m.',
+                  workoutType: WorkoutType.rowing,
                   stages: [
                     const WorkoutStage(name: 'Warm-up', duration: Duration(minutes: 5), description: 'Gradual build.'),
                     for(int i=0; i<4; i++) ...[
@@ -87,6 +89,7 @@ TrainingPlan insideIndoorBeginnerPlan() {
               workout: Workout(
                   title: '10 min Split Row',
                   description: '5 mins low intensity, 5 mins medium intensity.',
+                  workoutType: WorkoutType.rowing,
                   stages: [
                     const WorkoutStage(name: 'Warm-up', duration: Duration(minutes: 5)),
                     const WorkoutStage(name: 'Low Intensity', duration: Duration(minutes: 5), description: '18-20 SPM.'),
@@ -115,6 +118,7 @@ TrainingPlan insideIndoorBeginnerPlan() {
               workout: Workout(
                   title: '2000m Time Trial',
                   description: 'This is it. Row 2000m as fast as you can manage.',
+                  workoutType: WorkoutType.rowing,
                   stages: [
                     const WorkoutStage(name: 'Warm-up', duration: Duration(minutes: 10), description: 'Thorough warm up with bursts.'),
                     const WorkoutStage(name: '2000m Row', duration: Duration(minutes: 8), description: 'Pace yourself. Aim to finish strong!'),
@@ -164,6 +168,7 @@ TrainingPlan insideIndoorIntermediatePlan() {
               workout: Workout(
                   title: '10 min Rate Pyramid',
                   description: 'Control your stroke rate accurately.',
+                  workoutType: WorkoutType.rowing,
                   stages: [
                     const WorkoutStage(name: 'Warm-up', duration: Duration(minutes: 10)),
                     const WorkoutStage(name: '2 min @ 20', duration: Duration(minutes: 2), description: '20 SPM'),
@@ -181,6 +186,7 @@ TrainingPlan insideIndoorIntermediatePlan() {
               workout: Workout(
                   title: '2 Sets of (3 x 1min)',
                   description: 'High intensity sprints with 90s rest.',
+                  workoutType: WorkoutType.rowing,
                   stages: [
                     const WorkoutStage(name: 'Warm-up', duration: Duration(minutes: 10)),
                     // Set 1
@@ -209,6 +215,7 @@ TrainingPlan insideIndoorIntermediatePlan() {
               workout: Workout(
                   title: '14 min Rate Pyramid',
                   description: '3 min @ 20, 3 @ 22, 2 @ 24, 3 @ 22, 3 @ 20.',
+                  workoutType: WorkoutType.rowing,
                   stages: [
                     const WorkoutStage(name: 'Warm-up', duration: Duration(minutes: 10)),
                     const WorkoutStage(name: '3 min @ 20', duration: Duration(minutes: 3), description: 'Strong and controlled.'),
@@ -226,6 +233,7 @@ TrainingPlan insideIndoorIntermediatePlan() {
               workout: Workout(
                   title: '2 x 1000m',
                   description: 'Race pace practice. 4 mins rest between.',
+                  workoutType: WorkoutType.rowing,
                   stages: [
                     const WorkoutStage(name: 'Warm-up', duration: Duration(minutes: 10)),
                     const WorkoutStage(name: '1000m Effort', duration: Duration(minutes: 4), description: 'Target 2k pace.'),
@@ -244,6 +252,7 @@ TrainingPlan insideIndoorIntermediatePlan() {
               workout: Workout(
                   title: 'Light Pyramid',
                   description: 'Short sharp burst to keep legs fresh. 2 mins @ 20, 1 min @ 24, 2 mins @ 20.',
+                  workoutType: WorkoutType.rowing,
                   stages: [
                     const WorkoutStage(name: 'Warm-up', duration: Duration(minutes: 10)),
                     const WorkoutStage(name: '2 min @ 20', duration: Duration(minutes: 2), description: 'Easy pressure.'),
@@ -259,6 +268,7 @@ TrainingPlan insideIndoorIntermediatePlan() {
               workout: Workout(
                   title: '2000m Time Trial',
                   description: 'Go for a Personal Best. You are ready!',
+                  workoutType: WorkoutType.rowing,
                   stages: [
                     const WorkoutStage(name: 'Warm-up', duration: Duration(minutes: 15), description: 'Prepare mentally and physically.'),
                     const WorkoutStage(name: '2000m Row', duration: Duration(minutes: 7, seconds: 30), description: 'Leave it all on the machine.'),
@@ -281,6 +291,7 @@ TrainingPlan insideIndoorIntermediatePlan() {
               workout: Workout(
                   title: '3 x 750m',
                   description: 'Hard distance intervals.',
+                  workoutType: WorkoutType.rowing,
                   stages: [
                     const WorkoutStage(name: 'Warm-up', duration: Duration(minutes: 10)),
                     const WorkoutStage(name: '750m', duration: Duration(minutes: 3), description: 'Hard.'),
@@ -319,6 +330,7 @@ TrainingPlan rowingPlan() {
             workout: Workout(
               title: 'Technique Focus',
               description: 'Learn the basics of rowing form.',
+              workoutType: WorkoutType.rowing,
               stages: [
                 const WorkoutStage(name: 'Warm-up', duration: Duration(minutes: 5), description: 'Pick drill.'),
                 const WorkoutStage(name: 'Drills', duration: Duration(minutes: 15), description: 'Pause drills.'),
@@ -348,6 +360,7 @@ TrainingPlan petePlan() {
             workout: Workout(
               title: '5000m @ 22-24 spm',
               description: 'Focus on long, powerful strokes.',
+              workoutType: WorkoutType.rowing,
               stages: [
                 const WorkoutStage(name: 'Warm-up', duration: Duration(minutes: 5), description: 'Build pressure.'),
                 const WorkoutStage(name: '5000m Row', duration: Duration(minutes: 20), description: 'Maintain consistent split.'),

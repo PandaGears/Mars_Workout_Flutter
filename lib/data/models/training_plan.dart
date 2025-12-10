@@ -5,7 +5,7 @@ class TrainingPlan extends Equatable {
   final String id;
   final String title;
   final String description;
-  final String difficulty; // e.g., Beginner, Intermediate
+  final String difficulty;
   final List<PlanWeek> weeks;
 
   const TrainingPlan({

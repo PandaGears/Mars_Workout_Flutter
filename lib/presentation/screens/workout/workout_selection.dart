@@ -21,7 +21,7 @@ class WorkoutSelectionScreen extends StatelessWidget {
     final theme = Theme.of(context);
 
     return Scaffold(
-      backgroundColor: theme.colorScheme.background,
+      backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
         title: Text(title),
       ),
@@ -39,7 +39,7 @@ class WorkoutSelectionScreen extends StatelessWidget {
             child: ListView.separated(
               padding: const EdgeInsets.symmetric(horizontal: 20),
               itemCount: options.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 16),
+              separatorBuilder: (_, _) => const SizedBox(height: 16),
               itemBuilder: (context, index) {
                 final workout = options[index];
                 return Card(
@@ -51,7 +51,6 @@ class WorkoutSelectionScreen extends StatelessWidget {
                   child: InkWell(
                     borderRadius: BorderRadius.circular(16),
                     onTap: () {
-                      // Navigate to the actual workout with the SELECTED option
                       Navigator.pushReplacement(
                         context,
                         MaterialPageRoute(

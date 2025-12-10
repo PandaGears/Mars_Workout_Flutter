@@ -47,9 +47,9 @@ class PlanDetailScreen extends StatelessWidget {
                   width: double.infinity,
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: theme.primaryColor.withOpacity(0.1),
+                    color: theme.primaryColor.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: theme.primaryColor.withOpacity(0.2)),
+                    border: Border.all(color: theme.primaryColor.withValues(alpha: 0.2)),
                   ),
                   child: Text(
                     "You are currently working on this plan.",
