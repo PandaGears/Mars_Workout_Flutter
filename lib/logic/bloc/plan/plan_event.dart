@@ -1,6 +1,6 @@
 import 'package:equatable/equatable.dart';
+import 'package:mars_workout_app/core/constants/enums/workout_type.dart';
 
-// --- EVENTS ---
 abstract class PlanEvent extends Equatable {
   const PlanEvent();
   @override
@@ -9,7 +9,9 @@ abstract class PlanEvent extends Equatable {
 
 class StartPlan extends PlanEvent {
   final String planId;
-  const StartPlan(this.planId);
+  final WorkoutType type; // Added Type
+
+  const StartPlan(this.planId, this.type);
 }
 
 class CompleteDay extends PlanEvent {
@@ -19,11 +21,7 @@ class CompleteDay extends PlanEvent {
 
 class MarkDayAsCompleted extends PlanEvent {
   final String dayId;
-
   const MarkDayAsCompleted(this.dayId);
-
-  @override
-  List<Object> get props => [dayId];
 }
 
 class ResetProgress extends PlanEvent {}

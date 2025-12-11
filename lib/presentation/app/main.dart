@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:hydrated_bloc/hydrated_bloc.dart';
+import 'package:mars_workout_app/core/services/audio_service.dart';
 import 'package:mars_workout_app/core/theme/app_theme.dart';
 import 'package:mars_workout_app/presentation/screens/home_screen/home_page.dart';
 import 'package:path_provider/path_provider.dart';
@@ -10,7 +11,7 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   HydratedBloc.storage = await HydratedStorage.build(storageDirectory: await getApplicationDocumentsDirectory());
-
+  await SoundService().init();
   runApp(const MyApp());
 }
 

@@ -1,3 +1,4 @@
+// lib/presentation/screens/plan_list_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:mars_workout_app/core/constants/enums/workout_type.dart';
@@ -25,22 +26,30 @@ class PlanListScreen extends StatelessWidget {
             itemBuilder: (context, index) {
               final plan = plans[index];
               final progress = plan.calculateProgress(state.completedDayIds);
-              final isActive = state.activePlanId == plan.id;
+
+              // Correct Check: Is this specific plan the one saved for this WorkoutType?
+              final isActive = state.isPlanActive(plan.id, workoutType);
+
               return Card(
-                surfaceTintColor: progress * 100 == 100 ? theme.colorScheme.tertiary.withValues(alpha: 0.2) : null,
-                shadowColor: null,
-                shape: progress * 100 == 100
-                    ? RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                        side: BorderSide(color: theme.colorScheme.tertiary, width: 2),
-                      )
+                surfaceTintColor: progress >= 1.0
+                    ? theme.colorScheme.tertiaryContainer
                     : isActive
+                    ? theme.colorScheme.primaryContainer
+                    : null,
+                shadowColor: null,
+                shape: isActive || progress >= 1.0
                     ? RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                        side: BorderSide(color: theme.primaryColor, width: 2),
-                      )
-                    : null, // Falls back to AppTheme
-                elevation: progress * 100 == 100 || isActive ? 2 : 0,
+                  borderRadius: BorderRadius.circular(16),
+                  side: BorderSide(
+                    // Green if done, Blue if Active, None if neither
+                      color: progress >= 1.0
+                          ? theme.colorScheme.tertiary
+                          : isActive ? theme.primaryColor : Colors.transparent,
+                      width: 2
+                  ),
+                )
+                    : null,
+                elevation: isActive || progress >= 1.0 ? 4 : 1, // Higher lift for active
                 child: InkWell(
                   onTap: () {
                     Navigator.push(context, MaterialPageRoute(builder: (_) => PlanDetailScreen(plan: plan)));
@@ -55,29 +64,19 @@ class PlanListScreen extends StatelessWidget {
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Expanded(child: Text(plan.title, style: theme.textTheme.titleLarge)),
-                            if (progress * 100 == 100) ...[
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                decoration: BoxDecoration(color: theme.colorScheme.tertiary.withValues(alpha: 0.25), borderRadius: BorderRadius.circular(20)),
-                                child: Text(
-                                  "Complete",
-                                  style: TextStyle(color: theme.colorScheme.tertiary, fontSize: 12, fontWeight: FontWeight.bold),
-                                ),
-                              ),
-                            ] else if (isActive)
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                decoration: BoxDecoration(color: theme.primaryColor.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(20)),
-                                child: Text(
-                                  "Active",
-                                  style: TextStyle(color: theme.primaryColor, fontSize: 12, fontWeight: FontWeight.bold),
-                                ),
-                              ),
+
+                            // STATUS BADGES
+                            if (progress >= 1.0)
+                              _buildStatusBadge(theme, "Complete", theme.colorScheme.tertiaryContainer, theme.colorScheme.onTertiaryContainer)
+                            else if (isActive)
+                              _buildStatusBadge(theme, "Active", theme.colorScheme.primaryContainer, theme.colorScheme.onPrimaryContainer),
                           ],
                         ),
                         const SizedBox(height: 8),
                         Text(plan.description, style: theme.textTheme.bodyMedium),
                         const SizedBox(height: 16),
+
+                        // Progress Bar
                         Row(
                           children: [
                             Expanded(
@@ -85,12 +84,10 @@ class PlanListScreen extends StatelessWidget {
                                 borderRadius: BorderRadius.circular(4),
                                 child: LinearProgressIndicator(
                                   value: progress,
-                                  backgroundColor: theme.colorScheme.surface,
-                                  color: progress * 100 == 100
+                                  backgroundColor: theme.colorScheme.surfaceContainerHighest,
+                                  color: progress >= 1.0
                                       ? theme.colorScheme.tertiary
-                                      : isActive
-                                      ? theme.primaryColor
-                                      : Colors.grey,
+                                      : isActive ? theme.primaryColor : Colors.grey,
                                   minHeight: 6,
                                 ),
                               ),
@@ -107,6 +104,20 @@ class PlanListScreen extends StatelessWidget {
             },
           );
         },
+      ),
+    );
+  }
+
+  Widget _buildStatusBadge(ThemeData theme, String text, Color bg, Color fg) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+          color: bg,
+          borderRadius: BorderRadius.circular(20)
+      ),
+      child: Text(
+        text,
+        style: TextStyle(color: fg, fontSize: 12, fontWeight: FontWeight.bold),
       ),
     );
   }

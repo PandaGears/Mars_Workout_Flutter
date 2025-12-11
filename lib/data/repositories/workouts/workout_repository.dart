@@ -14,11 +14,10 @@ class WorkoutRepository {
       bicycleNetwork150kmPlan(), // NEW
       discovery30kmBeginnerPlan(), // NEW
       cssFitness12WeekPlan(),
-      cyclingPlan(),
       rowingPlan(),
       insideIndoorBeginnerPlan(),
       insideIndoorIntermediatePlan(),
-      petePlan(),
+      thePetePlan(),
       kettlebellPlan(),
       plan015KettlebellProgram(),];
   }

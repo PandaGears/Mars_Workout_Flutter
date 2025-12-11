@@ -4,7 +4,40 @@ import '../../models/workout_model.dart';
 import '../misc/misc_repository.dart';
 
 // ==============================================================================
-// 1. DISCOVERY 30KM BEGINNER PLAN (Corrected 7-Day PDF Schedule)
+// ZONE DESCRIPTIONS (Single Source of Truth)
+// ==============================================================================
+class ZoneDesc {
+  static const String z0 =
+      "Warm Up: Very light spinning.\n"
+      "Get the blood flowing and legs ready. Minimal effort, just turning the pedals.";
+
+  static const String z1 =
+      "Active Recovery: Can sing a song.\n"
+      "Very easy spinning with minimal resistance. Use this to flush out legs and recover.";
+
+  static const String z2 =
+      "Endurance: Can hold a full conversation.\n"
+      "'All day' pace. You are working but not struggling. This burns fat and builds your aerobic engine.";
+
+  static const String z3 =
+      "Tempo: Can speak in short sentences.\n"
+      "'Comfortably Hard.' You have to focus to keep this pace up. Breathing is deeper and rhythmic.";
+
+  static const String sweetSpot =
+      "Sweet Spot: Can speak a few words at a time.\n"
+      "The 'Goldilocks' zone. Hard enough to build big power, but sustainable for long blocks (10-20m).";
+
+  static const String z4 =
+      "Threshold: Can hardly speak.\n"
+      "Your 1-hour race pace. Legs start to burn significantly. Requires mental toughness to hold.";
+
+  static const String z5 =
+      "Max Effort: Cannot speak.\n"
+      "All-out effort. Sprints or steep hill attacks. You should be gasping for air.";
+}
+
+// ==============================================================================
+// 1. DISCOVERY 30KM BEGINNER PLAN
 // ==============================================================================
 
 TrainingPlan discovery30kmBeginnerPlan() {
@@ -17,73 +50,54 @@ TrainingPlan discovery30kmBeginnerPlan() {
     weeks: List.generate(8, (index) {
       int weekNum = index + 1;
 
-      // Default Placeholder Workouts
       Workout tuesdayRide = _restDayWorkout();
       Workout thursdayRide = _restDayWorkout();
       Workout saturdayRide = _restDayWorkout();
-      Workout sundayRide = _discRecoveryRide(); // Almost always 30m recovery
+      Workout sundayRide = _discRecoveryRide();
 
-      // --- WEEKLY SCHEDULE FROM PDF ---
-
+      // --- WEEKLY SCHEDULE ---
       if (weekNum == 1) {
-        // Week 1: Base
         tuesdayRide = _discBaseRide(30);
         thursdayRide = _discBaseRide(40);
         saturdayRide = _discBaseRide(60);
-        sundayRide = _discRecoveryRide();
       }
       else if (weekNum == 2) {
-        // Week 2: Build
         tuesdayRide = _discIMTGRide(30);
         thursdayRide = _discBaseRide(45);
-        saturdayRide = _discBaseRide(70); // 1h 10m
-        sundayRide = _discRecoveryRide();
+        saturdayRide = _discBaseRide(70);
       }
       else if (weekNum == 3) {
-        // Week 3: Intervals Start
         tuesdayRide = _discIMTGRide(40);
-        thursdayRide = _discIntervals(15, 4, 2, 4, 10); // 4x2min intervals
-        saturdayRide = _discBaseRide(70); // 1h 10m
-        sundayRide = _discRecoveryRide();
+        thursdayRide = _discIntervals(15, 4, 2, 4, 10);
+        saturdayRide = _discBaseRide(70);
       }
       else if (weekNum == 4) {
-        // Week 4: Volume
         tuesdayRide = _discBaseRide(50);
-        thursdayRide = _discIntervals(15, 4, 3, 4, 10); // 4x3min intervals
-        saturdayRide = _discBaseRide(80); // 1h 20m
-        sundayRide = _discRecoveryRide();
+        thursdayRide = _discIntervals(15, 4, 3, 4, 10);
+        saturdayRide = _discBaseRide(80);
       }
       else if (weekNum == 5) {
-        // Week 5: Climbing
         tuesdayRide = _discBaseRide(60);
-        thursdayRide = _discHillIntervals(20, 2, 8, 10); // 2x8min Hills
-        saturdayRide = _discBaseRide(90); // 1h 30m
-        sundayRide = _discRecoveryRide();
+        thursdayRide = _discHillIntervals(20, 2, 8, 10);
+        saturdayRide = _discBaseRide(90);
       }
       else if (weekNum == 6) {
-        // Week 6: Peak Climbing
-        tuesdayRide = _discHillIntervals(20, 3, 6, 10); // 3x6min Hills
-        thursdayRide = _discBaseRide(60); // 1h Tempo
-        saturdayRide = _discBaseRide(100); // 1h 40m (Peak Long Ride)
-        sundayRide = _discRecoveryRide();
+        tuesdayRide = _discHillIntervals(20, 3, 6, 10);
+        thursdayRide = _discBaseRide(60);
+        saturdayRide = _discBaseRide(100);
       }
       else if (weekNum == 7) {
-        // Week 7: Speed & Taper Start
-        tuesdayRide = _discIntervals(20, 5, 2, 5, 20); // 5x2min Z4
+        tuesdayRide = _discIntervals(20, 5, 2, 5, 20);
         thursdayRide = _discBaseRide(60);
-        saturdayRide = _discBaseRide(75); // 1h 15m (Tapering down)
-        sundayRide = _discRecoveryRide();
+        saturdayRide = _discBaseRide(75);
       }
       else if (weekNum == 8) {
-        // Week 8: RACE WEEK
-        tuesdayRide = _discIntervals(20, 4, 2, 5, 10); // Sharpening intervals
-        thursdayRide = _discPrimingRide(); // 30m with bursts
-        saturdayRide = _restDayWorkout(); // Total rest before race
-        sundayRide = _discRaceDayWorkout(); // RACE DAY
+        tuesdayRide = _discIntervals(20, 4, 2, 5, 10);
+        thursdayRide = _discPrimingRide();
+        saturdayRide = _restDayWorkout();
+        sundayRide = _discRaceDayWorkout();
       }
 
-      // --- 7-DAY STRUCTURE ---
-      // Mon/Wed/Fri are always REST in this plan
       return PlanWeek(
         weekNumber: weekNum,
         days: [
@@ -107,7 +121,7 @@ Workout _restDayWorkout() {
     title: 'Rest Day',
     description: 'Rest is vital. Mark this day as complete to stay on track.',
     stages: [
-      WorkoutStage(name: 'Resting...', duration: Duration(seconds: 1), description: 'Relax.'),
+      WorkoutStage(name: 'Resting...', duration: Duration(seconds: 1), description: 'Relax. Good sleep is the best recovery tool.'),
     ],
   );
 }
@@ -115,11 +129,11 @@ Workout _restDayWorkout() {
 Workout _discBaseRide(int mins) {
   return Workout(
     title: 'Base Ride ($mins mins)',
-    description: 'Zone 2/3. Keep cadence >85 RPM. Comfortable, conversational pace.',
+    description: 'Steady aerobic miles. Focus on smooth pedal circles.',
     stages: [
-      const WorkoutStage(name: 'Warm-up', duration: Duration(minutes: 5), description: 'Spin easy.'),
-      WorkoutStage(name: 'Steady Ride', duration: Duration(minutes: mins - 10), description: 'Zone 2/3. Smooth circles.'),
-      const WorkoutStage(name: 'Cool-down', duration: Duration(minutes: 5), description: 'Easy spin.'),
+      const WorkoutStage(name: 'Warm-up', duration: Duration(minutes: 5), description: ZoneDesc.z0),
+      WorkoutStage(name: 'Steady Ride', duration: Duration(minutes: mins - 10), description: ZoneDesc.z2),
+      const WorkoutStage(name: 'Cool-down', duration: Duration(minutes: 5), description: ZoneDesc.z1),
     ],
   );
 }
@@ -127,11 +141,11 @@ Workout _discBaseRide(int mins) {
 Workout _discRecoveryRide() {
   return const Workout(
     title: 'Recovery Ride (30m)',
-    description: 'Zone 2 ONLY. Very easy spin to flush out legs. >85 RPM.',
+    description: 'Flush out the legs. If you sweat, you are going too hard.',
     stages: [
-      WorkoutStage(name: 'Warm-up', duration: Duration(minutes: 5), description: 'Very easy.'),
-      WorkoutStage(name: 'Recovery Spin', duration: Duration(minutes: 20), description: 'Zone 2. No resistance.'),
-      WorkoutStage(name: 'Cool-down', duration: Duration(minutes: 5)),
+      WorkoutStage(name: 'Warm-up', duration: Duration(minutes: 5), description: ZoneDesc.z0),
+      WorkoutStage(name: 'Recovery Spin', duration: Duration(minutes: 20), description: ZoneDesc.z1),
+      WorkoutStage(name: 'Cool-down', duration: Duration(minutes: 5), description: ZoneDesc.z1),
     ],
   );
 }
@@ -139,11 +153,15 @@ Workout _discRecoveryRide() {
 Workout _discIMTGRide(int mins) {
   return Workout(
     title: 'IMTG Ride ($mins mins)',
-    description: 'FASTED RIDE (No breakfast). Teaches body to burn fat. Keep intensity LOW (Zone 2).',
+    description: 'FASTED RIDE (No breakfast). Teaches body to burn fat. Keep intensity LOW.',
     stages: [
-      const WorkoutStage(name: 'Warm-up', duration: Duration(minutes: 5)),
-      WorkoutStage(name: 'Fasted Zone 2', duration: Duration(minutes: mins), description: 'Steady pace. Do not spike HR.'),
-      const WorkoutStage(name: 'Cool-down', duration: Duration(minutes: 5)),
+      const WorkoutStage(name: 'Warm-up', duration: Duration(minutes: 5), description: ZoneDesc.z0),
+      WorkoutStage(
+          name: 'Fasted Zone 2',
+          duration: Duration(minutes: mins),
+          description: "${ZoneDesc.z2}\nIMPORTANT: Do not spike your heart rate."
+      ),
+      const WorkoutStage(name: 'Cool-down', duration: Duration(minutes: 5), description: ZoneDesc.z1),
     ],
   );
 }
@@ -153,12 +171,12 @@ Workout _discIntervals(int warm, int sets, int work, int rest, int cool) {
     title: 'Intervals ($sets x $work min)',
     description: 'High intensity efforts to build speed and power.',
     stages: [
-      WorkoutStage(name: 'Warm-up', duration: Duration(minutes: warm), description: 'Progressive warmup.'),
+      WorkoutStage(name: 'Warm-up', duration: Duration(minutes: warm), description: "Progressive: Start Z0, build to Z2."),
       for(int i=0; i<sets; i++) ...[
-        WorkoutStage(name: 'Hard Effort', duration: Duration(minutes: work), description: 'Zone 4/5. High gear, low cadence (45-50rpm) or high speed.'),
-        WorkoutStage(name: 'Recovery', duration: Duration(minutes: rest), description: 'Spin easy.'),
+        WorkoutStage(name: 'Hard Effort', duration: Duration(minutes: work), description: ZoneDesc.z4),
+        WorkoutStage(name: 'Recovery', duration: Duration(minutes: rest), description: ZoneDesc.z1),
       ],
-      WorkoutStage(name: 'Cool-down', duration: Duration(minutes: cool)),
+      WorkoutStage(name: 'Cool-down', duration: Duration(minutes: cool), description: ZoneDesc.z1),
     ],
   );
 }
@@ -166,14 +184,18 @@ Workout _discIntervals(int warm, int sets, int work, int rest, int cool) {
 Workout _discHillIntervals(int warm, int sets, int work, int cool) {
   return Workout(
     title: 'Hill Repeats ($sets x $work min)',
-    description: 'Seated climbing strength. Keep cadence low (50-65 RPM).',
+    description: 'Seated climbing strength. Keep cadence low (50-65 RPM) to simulate a steep gradient.',
     stages: [
-      WorkoutStage(name: 'Warm-up', duration: Duration(minutes: warm)),
+      WorkoutStage(name: 'Warm-up', duration: Duration(minutes: warm), description: ZoneDesc.z2),
       for(int i=0; i<sets; i++) ...[
-        WorkoutStage(name: 'Seated Climb', duration: Duration(minutes: work), description: 'Moderate gradient. Stay seated. Grind it out.'),
-        WorkoutStage(name: 'Recovery', duration: Duration(minutes: 8), description: 'Roll down/Spin easy.'),
+        WorkoutStage(
+            name: 'Seated Climb',
+            duration: Duration(minutes: work),
+            description: "${ZoneDesc.z3}\nTechnique: Stay seated, hands on tops, drive from the glutes."
+        ),
+        WorkoutStage(name: 'Recovery', duration: Duration(minutes: 8), description: ZoneDesc.z1),
       ],
-      WorkoutStage(name: 'Cool-down', duration: Duration(minutes: cool)),
+      WorkoutStage(name: 'Cool-down', duration: Duration(minutes: cool), description: ZoneDesc.z1),
     ],
   );
 }
@@ -181,15 +203,15 @@ Workout _discHillIntervals(int warm, int sets, int work, int cool) {
 Workout _discPrimingRide() {
   return const Workout(
     title: 'Race Priming (30m)',
-    description: 'Short ride with bursts to wake up the legs.',
+    description: 'Short ride with bursts to wake up the legs without fatigue.',
     stages: [
-      WorkoutStage(name: 'Warm-up', duration: Duration(minutes: 10)),
-      WorkoutStage(name: 'Accel 1', duration: Duration(minutes: 2), description: 'High gear, low cadence.'),
-      WorkoutStage(name: 'Rest', duration: Duration(minutes: 4)),
-      WorkoutStage(name: 'Accel 2', duration: Duration(minutes: 2), description: 'Pick up speed.'),
-      WorkoutStage(name: 'Rest', duration: Duration(minutes: 4)),
-      WorkoutStage(name: 'Accel 3', duration: Duration(minutes: 2), description: 'Race pace feeling.'),
-      WorkoutStage(name: 'Cool-down', duration: Duration(minutes: 6)),
+      WorkoutStage(name: 'Warm-up', duration: Duration(minutes: 10), description: ZoneDesc.z0),
+      WorkoutStage(name: 'Accel 1', duration: Duration(minutes: 2), description: "${ZoneDesc.z3}\nHigh gear strength."),
+      WorkoutStage(name: 'Rest', duration: Duration(minutes: 4), description: ZoneDesc.z1),
+      WorkoutStage(name: 'Accel 2', duration: Duration(minutes: 2), description: "${ZoneDesc.z4}\nPick up speed."),
+      WorkoutStage(name: 'Rest', duration: Duration(minutes: 4), description: ZoneDesc.z1),
+      WorkoutStage(name: 'Accel 3', duration: Duration(minutes: 2), description: "${ZoneDesc.z5}\nRace pace feeling!"),
+      WorkoutStage(name: 'Cool-down', duration: Duration(minutes: 6), description: ZoneDesc.z1),
     ],
   );
 }
@@ -199,13 +221,13 @@ Workout _discRaceDayWorkout() {
     title: '30KM RACE',
     description: 'Race Day! Start steady, finish strong.',
     stages: [
-      WorkoutStage(name: 'The Race', duration: Duration(minutes: 90), description: 'Go get that medal!'),
+      WorkoutStage(name: 'The Race', duration: Duration(minutes: 90), description: 'Start in Z3 (Tempo). Save Z5 (Max Effort) for the last 5km!'),
     ],
   );
 }
 
 // ==============================================================================
-// 2. BICYCLE NETWORK 150KM PLAN (Existing)
+// 2. BICYCLE NETWORK 150KM PLAN
 // ==============================================================================
 
 TrainingPlan bicycleNetwork150kmPlan() {
@@ -255,16 +277,14 @@ TrainingPlan bicycleNetwork150kmPlan() {
   );
 }
 
-// --- BN Workout Generators ---
-
 Workout _bnAerobicRide(int totalMinutes) {
   return Workout(
     title: 'Aerobic Ride ($totalMinutes mins)',
-    description: 'Ride at a pace you could ride all day (3-4/10 effort).',
+    description: 'Ride at a pace you could ride all day.',
     stages: [
-      const WorkoutStage(name: 'Warm-up', duration: Duration(minutes: 5)),
-      WorkoutStage(name: 'Aerobic Base', duration: Duration(minutes: totalMinutes - 10), description: 'Zone 2: Conversational pace.'),
-      const WorkoutStage(name: 'Cool-down', duration: Duration(minutes: 5)),
+      const WorkoutStage(name: 'Warm-up', duration: Duration(minutes: 5), description: ZoneDesc.z0),
+      WorkoutStage(name: 'Aerobic Base', duration: Duration(minutes: totalMinutes - 10), description: ZoneDesc.z2),
+      const WorkoutStage(name: 'Cool-down', duration: Duration(minutes: 5), description: ZoneDesc.z1),
     ],
   );
 }
@@ -272,11 +292,11 @@ Workout _bnAerobicRide(int totalMinutes) {
 Workout _bnTempoRide(int totalMinutes) {
   return Workout(
     title: 'Tempo Ride ($totalMinutes mins)',
-    description: 'Harder than aerobic (5-6/10 effort). Breathing becomes audible.',
+    description: 'Harder than aerobic. Breathing becomes audible.',
     stages: [
-      const WorkoutStage(name: 'Warm-up', duration: Duration(minutes: 10)),
-      WorkoutStage(name: 'Tempo Effort', duration: Duration(minutes: totalMinutes - 15), description: 'Zone 3: "Comfortably Hard".'),
-      const WorkoutStage(name: 'Cool-down', duration: Duration(minutes: 5)),
+      const WorkoutStage(name: 'Warm-up', duration: Duration(minutes: 10), description: ZoneDesc.z0),
+      WorkoutStage(name: 'Tempo Effort', duration: Duration(minutes: totalMinutes - 15), description: ZoneDesc.z3),
+      const WorkoutStage(name: 'Cool-down', duration: Duration(minutes: 5), description: ZoneDesc.z1),
     ],
   );
 }
@@ -286,9 +306,9 @@ Workout _bnEnduranceRide(int totalMinutes) {
     title: 'Endurance Ride (${(totalMinutes/60).toStringAsFixed(1)} hrs)',
     description: 'Long steady distance. Build mental and physical stamina.',
     stages: [
-      const WorkoutStage(name: 'Warm-up', duration: Duration(minutes: 10)),
-      WorkoutStage(name: 'The Long Ride', duration: Duration(minutes: totalMinutes - 20), description: 'Zone 2: Stay consistent.'),
-      const WorkoutStage(name: 'Cool-down', duration: Duration(minutes: 10)),
+      const WorkoutStage(name: 'Warm-up', duration: Duration(minutes: 10), description: ZoneDesc.z0),
+      WorkoutStage(name: 'The Long Ride', duration: Duration(minutes: totalMinutes - 20), description: ZoneDesc.z2),
+      const WorkoutStage(name: 'Cool-down', duration: Duration(minutes: 10), description: ZoneDesc.z1),
     ],
   );
 }
@@ -300,14 +320,14 @@ Workout _bnSweetSpotWorkout(int week) {
 
   return Workout(
     title: 'Sweet Spot Blocks',
-    description: 'Effort 6-7/10. "Sweet Spot" is just below your threshold.',
+    description: 'Effort just below your threshold.',
     stages: [
-      const WorkoutStage(name: 'Warm-up', duration: Duration(minutes: 15)),
+      const WorkoutStage(name: 'Warm-up', duration: Duration(minutes: 15), description: ZoneDesc.z2),
       for(int i=0; i<reps; i++) ...[
-        WorkoutStage(name: 'Sweet Spot Block', duration: Duration(minutes: workMin), description: 'Strong effort.'),
-        WorkoutStage(name: 'Recovery', duration: Duration(minutes: restMin), description: 'Easy spinning.'),
+        WorkoutStage(name: 'Sweet Spot', duration: Duration(minutes: workMin), description: ZoneDesc.sweetSpot),
+        WorkoutStage(name: 'Recovery', duration: Duration(minutes: restMin), description: ZoneDesc.z1),
       ],
-      const WorkoutStage(name: 'Cool-down', duration: Duration(minutes: 10)),
+      const WorkoutStage(name: 'Cool-down', duration: Duration(minutes: 10), description: ZoneDesc.z1),
     ],
   );
 }
@@ -317,12 +337,12 @@ Workout _bnHighCadenceDrills() {
     title: 'High Cadence Drills',
     description: '1 min fast spin, 4 min recovery. Improves efficiency.',
     stages: [
-      const WorkoutStage(name: 'Warm-up', duration: Duration(minutes: 15)),
+      const WorkoutStage(name: 'Warm-up', duration: Duration(minutes: 15), description: ZoneDesc.z2),
       for(int i=0; i<8; i++) ...[
-        const WorkoutStage(name: 'Spin-Up!', duration: Duration(minutes: 1), description: '100+ RPM.'),
-        const WorkoutStage(name: 'Recovery', duration: Duration(minutes: 4), description: 'Easy gear.'),
+        const WorkoutStage(name: 'Spin-Up!', duration: Duration(minutes: 1), description: "Max RPM: Spin as fast as you can without bouncing in the saddle (100-120 RPM)."),
+        const WorkoutStage(name: 'Recovery', duration: Duration(minutes: 4), description: ZoneDesc.z1),
       ],
-      const WorkoutStage(name: 'Cool-down', duration: Duration(minutes: 10)),
+      const WorkoutStage(name: 'Cool-down', duration: Duration(minutes: 10), description: ZoneDesc.z1),
     ],
   );
 }
@@ -383,13 +403,13 @@ Workout speedIntervalsWorkout({required bool isShort}) {
     title: isShort ? 'Speed Intervals (30m)' : 'Speed Intervals (60m)',
     description: 'High-cadence efforts to improve leg speed.',
     stages: [
-      WorkoutStage(name: 'Warm-up', duration: Duration(minutes: isShort ? 5 : 10), description: 'Spin Easy.'),
+      WorkoutStage(name: 'Warm-up', duration: Duration(minutes: isShort ? 5 : 10), description: ZoneDesc.z0),
       for (int i = 0; i < (isShort ? 4 : 8); i++) ...[
-        const WorkoutStage(name: 'Tempo Effort', duration: Duration(minutes: 2), description: '80% Effort.'),
-        const WorkoutStage(name: 'Max Sprint', duration: Duration(seconds: 30), description: '100% Effort!'),
-        const WorkoutStage(name: 'Recovery', duration: Duration(minutes: 2), description: 'Recover.'),
+        const WorkoutStage(name: 'Tempo Effort', duration: Duration(minutes: 2), description: ZoneDesc.z3),
+        const WorkoutStage(name: 'Max Sprint', duration: Duration(seconds: 30), description: ZoneDesc.z5),
+        const WorkoutStage(name: 'Recovery', duration: Duration(minutes: 2), description: ZoneDesc.z1),
       ],
-      const WorkoutStage(name: 'Cool-down', duration: Duration(minutes: 5), description: 'Spin Easy.'),
+      const WorkoutStage(name: 'Cool-down', duration: Duration(minutes: 5), description: ZoneDesc.z1),
     ],
   );
 }
@@ -399,19 +419,19 @@ Workout ladderIntervalsWorkout({required bool isShort}) {
     title: isShort ? 'Ladder Intervals (30m)' : 'Ladder Intervals (60m)',
     description: 'Progressively longer intervals.',
     stages: [
-      const WorkoutStage(name: 'Warm-up', duration: Duration(minutes: 5)),
+      const WorkoutStage(name: 'Warm-up', duration: Duration(minutes: 5), description: ZoneDesc.z0),
       ...[1, 2, 3, 2, 1].map((min) => [
-        WorkoutStage(name: '$min min Effort', duration: Duration(minutes: min), description: '90% Effort.'),
-        const WorkoutStage(name: 'Rest', duration: Duration(minutes: 1)),
+        WorkoutStage(name: '$min min Effort', duration: Duration(minutes: min), description: ZoneDesc.z4),
+        const WorkoutStage(name: 'Rest', duration: Duration(minutes: 1), description: ZoneDesc.z1),
       ]).expand((i) => i),
       if (!isShort) ...[
-        const WorkoutStage(name: 'Set Break', duration: Duration(minutes: 5)),
+        const WorkoutStage(name: 'Set Break', duration: Duration(minutes: 5), description: ZoneDesc.z1),
         ...[1, 2, 3, 2, 1].map((min) => [
-          WorkoutStage(name: '$min min Effort', duration: Duration(minutes: min), description: '90% Effort.'),
-          const WorkoutStage(name: 'Rest', duration: Duration(minutes: 1)),
+          WorkoutStage(name: '$min min Effort', duration: Duration(minutes: min), description: ZoneDesc.z4),
+          const WorkoutStage(name: 'Rest', duration: Duration(minutes: 1), description: ZoneDesc.z1),
         ]).expand((i) => i),
       ],
-      const WorkoutStage(name: 'Cool-down', duration: Duration(minutes: 5)),
+      const WorkoutStage(name: 'Cool-down', duration: Duration(minutes: 5), description: ZoneDesc.z1),
     ],
   );
 }
@@ -421,13 +441,25 @@ Workout climbingBurstsWorkout({required bool isShort}) {
     title: isShort ? 'Climbing Bursts (30m)' : 'Climbing Bursts (60m)',
     description: 'Simulated hill attacks.',
     stages: [
-      const WorkoutStage(name: 'Warm-up', duration: Duration(minutes: 5)),
+      const WorkoutStage(name: 'Warm-up', duration: Duration(minutes: 5), description: ZoneDesc.z0),
       for (int i = 0; i < (isShort ? 5 : 10); i++) ...[
-        const WorkoutStage(name: 'Climb Base', duration: Duration(minutes: 3), description: '80% Effort.'),
-        const WorkoutStage(name: 'Attack!', duration: Duration(seconds: 30), description: 'Stand 100%.'),
-        const WorkoutStage(name: 'Descend', duration: Duration(minutes: 1, seconds: 30), description: 'Recover.'),
+        const WorkoutStage(
+            name: 'Climb Base',
+            duration: Duration(minutes: 3),
+            description: "${ZoneDesc.z3}\nLow cadence (60rpm)."
+        ),
+        const WorkoutStage(
+            name: 'Attack!',
+            duration: Duration(seconds: 30),
+            description: "${ZoneDesc.z5}\nStand and Pedal 100%."
+        ),
+        const WorkoutStage(
+            name: 'Descend',
+            duration: Duration(minutes: 1, seconds: 30),
+            description: "${ZoneDesc.z1}\nRecover high cadence."
+        ),
       ],
-      const WorkoutStage(name: 'Cool-down', duration: Duration(minutes: 5)),
+      const WorkoutStage(name: 'Cool-down', duration: Duration(minutes: 5), description: ZoneDesc.z1),
     ],
   );
 }
@@ -437,11 +469,11 @@ Workout powerHourWorkout() {
     title: 'Power Hour: Sweet Spot',
     description: 'Sustained effort at 88-93% FTP.',
     stages: [
-      WorkoutStage(name: 'Warm-up', duration: Duration(minutes: 10)),
-      WorkoutStage(name: 'Sweet Spot 1', duration: Duration(minutes: 20), description: '80% Effort.'),
-      WorkoutStage(name: 'Recovery', duration: Duration(minutes: 5)),
-      WorkoutStage(name: 'Sweet Spot 2', duration: Duration(minutes: 20), description: '80% Effort.'),
-      WorkoutStage(name: 'Cool-down', duration: Duration(minutes: 5)),
+      WorkoutStage(name: 'Warm-up', duration: Duration(minutes: 10), description: ZoneDesc.z0),
+      WorkoutStage(name: 'Sweet Spot 1', duration: Duration(minutes: 20), description: ZoneDesc.sweetSpot),
+      WorkoutStage(name: 'Recovery', duration: Duration(minutes: 5), description: ZoneDesc.z1),
+      WorkoutStage(name: 'Sweet Spot 2', duration: Duration(minutes: 20), description: ZoneDesc.sweetSpot),
+      WorkoutStage(name: 'Cool-down', duration: Duration(minutes: 5), description: ZoneDesc.z1),
     ],
   );
 }
@@ -451,13 +483,13 @@ Workout powerHourThreshold() {
     title: 'Power Hour: Threshold',
     description: 'Higher intensity intervals at 100% FTP.',
     stages: [
-      WorkoutStage(name: 'Warm-up', duration: Duration(minutes: 10)),
-      WorkoutStage(name: 'Threshold 1', duration: Duration(minutes: 10), description: '90% Effort.'),
-      WorkoutStage(name: 'Rest', duration: Duration(minutes: 5)),
-      WorkoutStage(name: 'Threshold 2', duration: Duration(minutes: 10), description: '90% Effort.'),
-      WorkoutStage(name: 'Rest', duration: Duration(minutes: 5)),
-      WorkoutStage(name: 'Threshold 3', duration: Duration(minutes: 10), description: '90% Effort.'),
-      WorkoutStage(name: 'Cool-down', duration: Duration(minutes: 10)),
+      WorkoutStage(name: 'Warm-up', duration: Duration(minutes: 10), description: ZoneDesc.z0),
+      WorkoutStage(name: 'Threshold 1', duration: Duration(minutes: 10), description: ZoneDesc.z4),
+      WorkoutStage(name: 'Rest', duration: Duration(minutes: 5), description: ZoneDesc.z1),
+      WorkoutStage(name: 'Threshold 2', duration: Duration(minutes: 10), description: ZoneDesc.z4),
+      WorkoutStage(name: 'Rest', duration: Duration(minutes: 5), description: ZoneDesc.z1),
+      WorkoutStage(name: 'Threshold 3', duration: Duration(minutes: 10), description: ZoneDesc.z4),
+      WorkoutStage(name: 'Cool-down', duration: Duration(minutes: 10), description: ZoneDesc.z1),
     ],
   );
 }
@@ -467,9 +499,9 @@ Workout powerHourSteady() {
     title: 'Power Hour: Steady State',
     description: 'One long, unbroken effort.',
     stages: [
-      WorkoutStage(name: 'Warm-up', duration: Duration(minutes: 10)),
-      WorkoutStage(name: 'The Block', duration: Duration(minutes: 45), description: '80% Effort.'),
-      WorkoutStage(name: 'Cool-down', duration: Duration(minutes: 5)),
+      WorkoutStage(name: 'Warm-up', duration: Duration(minutes: 10), description: ZoneDesc.z0),
+      WorkoutStage(name: 'The Block', duration: Duration(minutes: 45), description: "${ZoneDesc.z3}\nDo not stop."),
+      WorkoutStage(name: 'Cool-down', duration: Duration(minutes: 5), description: ZoneDesc.z1),
     ],
   );
 }
@@ -479,9 +511,9 @@ Workout sundayRideWorkout() {
     title: 'Sunday Endurance',
     description: 'A very low-intensity ride to aid recovery.',
     stages: [
-      WorkoutStage(name: 'Warm-up', duration: Duration(minutes: 10)),
-      WorkoutStage(name: 'Steady State', duration: Duration(minutes: 40), description: 'Gentle Ride.'),
-      WorkoutStage(name: 'Cool-down', duration: Duration(minutes: 10)),
+      WorkoutStage(name: 'Warm-up', duration: Duration(minutes: 10), description: ZoneDesc.z0),
+      WorkoutStage(name: 'Steady State', duration: Duration(minutes: 40), description: ZoneDesc.z2),
+      WorkoutStage(name: 'Cool-down', duration: Duration(minutes: 10), description: ZoneDesc.z1),
     ],
   );
 }
@@ -504,9 +536,9 @@ TrainingPlan cyclingPlan() {
               title: 'Endurance Ride',
               description: 'Focus on maintaining a steady pace.',
               stages: [
-                WorkoutStage(name: 'Warm-up', duration: Duration(minutes: 10)),
-                WorkoutStage(name: 'Main Set', duration: Duration(minutes: 30), description: 'Hold Zone 2/3 power.'),
-                WorkoutStage(name: 'Cool-down', duration: Duration(minutes: 10)),
+                WorkoutStage(name: 'Warm-up', duration: Duration(minutes: 10), description: ZoneDesc.z0),
+                WorkoutStage(name: 'Main Set', duration: Duration(minutes: 30), description: ZoneDesc.z2),
+                WorkoutStage(name: 'Cool-down', duration: Duration(minutes: 10), description: ZoneDesc.z1),
               ],
             ),
           );

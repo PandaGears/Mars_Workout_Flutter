@@ -2,12 +2,14 @@ import 'package:flutter/material.dart';
 
 class AppTheme {
   // Base Colors
-  static const Color primaryColor = Color(0xFF448AFF); // BlueAccent
-  static const Color secondaryColor = Color(0xFFF5F5F5); // Light Grey Background
+  static const Color primaryColor = Color(0xFFFF5800);
+  static const Color primaryContainer = Color(0xFFFF9C6A);
+  static const Color secondaryColor = Color(0xFFF5F5F5);
   static const Color cardBackground = Colors.white;
   static const Color textDark = Color(0xFF212121);
   static const Color textLight = Color(0xFF757575);
-  static const Color successColor = Color(0xFF4CAF50); // Green
+  static const Color successColor = Color(0xFF4CAF50);
+  static const Color successContainer = Color(0xFFABFFB1);
   static const Color warningColor = Color(0xFFFFC107); // Amber
 
   static ThemeData get lightTheme {
@@ -16,7 +18,7 @@ class AppTheme {
       primaryColor: primaryColor,
       scaffoldBackgroundColor: secondaryColor,
 
-      colorScheme: const ColorScheme.light(primary: primaryColor, secondary: primaryColor, tertiary: successColor, surface: cardBackground, onSurface: textDark, error: Colors.redAccent),
+      colorScheme: const ColorScheme.light(primary: primaryColor, primaryContainer: primaryContainer, secondary: primaryColor, tertiary: successColor, tertiaryContainer: successContainer, surface: cardBackground, onSurface: textDark, error: Colors.redAccent),
 
       // Global AppBar Style
       appBarTheme: const AppBarTheme(

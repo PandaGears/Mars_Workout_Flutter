@@ -110,15 +110,9 @@ class WorkoutPreviewScreen extends StatelessWidget {
                     stage.name.toLowerCase().contains('recover');
                 final isWarmup = stage.name.toLowerCase().contains('warm');
 
-                Color iconColor = theme.primaryColor;
-                IconData icon = Icons.fitness_center;
 
                 if (isRest) {
-                  iconColor = Colors.green;
-                  icon = Icons.pause_circle_outline;
                 } else if (isWarmup) {
-                  iconColor = Colors.orange;
-                  icon = Icons.local_fire_department_outlined;
                 }
 
                 return Padding(
