@@ -53,7 +53,7 @@ class StageInfoAndSegmentBar extends StatelessWidget {
                   ? state.currentStage.description
                   : "Keep pushing!",
               textAlign: TextAlign.center,
-              maxLines: 99, // Allow full zone descriptions to show
+              maxLines: 99,
               overflow: TextOverflow.ellipsis,
               style: theme.textTheme.bodyMedium?.copyWith(color: Colors.grey.shade600),
             ),

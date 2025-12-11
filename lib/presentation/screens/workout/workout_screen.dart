@@ -48,7 +48,7 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
       body: Column(
         children: [
           Expanded(
-            flex: 5,
+            flex: 4,
             child: BlocBuilder<TimerBloc, TimerState>(
               buildWhen: (previous, current) =>
               previous.currentStageIndex != current.currentStageIndex,
@@ -75,7 +75,7 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
               },
             ),
           ),
-
+      
           Expanded(
             flex: 6,
             child: Container(
@@ -92,7 +92,6 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
                 ],
               ),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   const StageInfoAndSegmentBar(),
                   const Spacer(),

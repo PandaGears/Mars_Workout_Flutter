@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:hydrated_bloc/hydrated_bloc.dart';
 import 'package:mars_workout_app/core/services/audio_service.dart';
@@ -9,7 +10,15 @@ import '../../logic/bloc/plan/plan_bloc.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
 
+  // 2. MAKE SYSTEM BARS TRANSPARENT
+  SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
+    statusBarColor: Colors.transparent, // Transparent status bar
+    statusBarIconBrightness: Brightness.dark, // Dark icons (for light background)
+    systemNavigationBarColor: Colors.transparent, // Transparent nav bar
+    systemNavigationBarIconBrightness: Brightness.dark, // Dark icons
+  ));
   HydratedBloc.storage = await HydratedStorage.build(storageDirectory: await getApplicationDocumentsDirectory());
   await SoundService().init();
   runApp(const MyApp());
