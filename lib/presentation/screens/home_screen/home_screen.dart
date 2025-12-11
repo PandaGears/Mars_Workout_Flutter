@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:mars_workout_app/core/constants/enums/workout_type.dart';
-import 'package:mars_workout_app/presentation/screens/plan_list_screen.dart';
+import 'package:mars_workout_app/presentation/screens/home_screen/plan_list_screen.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -15,9 +15,9 @@ class HomeScreen extends StatelessWidget {
           bottom: TabBar(
             dividerColor: Colors.transparent,
             tabs: [
-              Tab(icon: Icon(Icons.directions_bike), text: "Cycling"),
-              Tab(icon: Icon(Icons.rowing), text: "Rowing"),
-              Tab(icon: Icon(Icons.fitness_center), text: "Kettlebell"),
+              Tab(icon: Icon(Icons.directions_bike), text: "Cycle"),
+              Tab(icon: Icon(Icons.rowing), text: "Row"),
+              Tab(icon: Icon(Icons.fitness_center), text: "Strength"),
               Tab(icon: Icon(Icons.directions_run), text: "Elliptical"),
             ],
           ),

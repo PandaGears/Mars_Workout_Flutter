@@ -1,7 +1,11 @@
 // lib/logic/bloc/plan/plan_bloc.dart
+import 'package:equatable/equatable.dart';
 import 'package:hydrated_bloc/hydrated_bloc.dart';
-import 'package:mars_workout_app/logic/bloc/plan/plan_event.dart';
-import 'package:mars_workout_app/logic/bloc/plan/plan_state.dart';
+import 'package:mars_workout_app/core/constants/enums/workout_type.dart';
+import 'package:mars_workout_app/data/models/training_plan.dart';
+
+part 'plan_event.dart';
+part 'plan_state.dart';
 
 class PlanBloc extends HydratedBloc<PlanEvent, PlanState> {
   PlanBloc() : super(const PlanState()) {

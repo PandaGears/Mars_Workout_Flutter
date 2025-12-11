@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:mars_workout_app/logic/bloc/timer/timer_bloc.dart';
-import 'package:mars_workout_app/logic/bloc/timer/timer_state.dart';
 
 class LinearTimerDisplay extends StatelessWidget {
   const LinearTimerDisplay({super.key});
@@ -12,8 +11,6 @@ class LinearTimerDisplay extends StatelessWidget {
 
     return BlocBuilder<TimerBloc, TimerState>(
       builder: (context, state) {
-        // If in prep, we show the full duration of the NEXT stage (0 progress)
-        // If working, we show actual elapsed time.
         final maxDuration = state.currentStage.duration;
 
         final durationToShow = state.isPrep

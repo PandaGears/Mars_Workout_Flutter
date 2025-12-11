@@ -1,9 +1,10 @@
 import 'dart:async';
+import 'package:equatable/equatable.dart';
 import 'package:hydrated_bloc/hydrated_bloc.dart';
 import 'package:mars_workout_app/data/models/workout_model.dart';
-import 'package:mars_workout_app/logic/bloc/timer/timer_event.dart';
-import 'package:mars_workout_app/logic/bloc/timer/timer_state.dart';
 
+part 'timer_event.dart';
+part 'timer_state.dart';
 class TimerBloc extends Bloc<TimerEvent, TimerState> {
   StreamSubscription<int>? _tickerSubscription;
 

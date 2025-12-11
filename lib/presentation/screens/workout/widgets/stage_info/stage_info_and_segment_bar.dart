@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:mars_workout_app/logic/bloc/timer/timer_bloc.dart';
-import 'package:mars_workout_app/logic/bloc/timer/timer_state.dart';
 
 class StageInfoAndSegmentBar extends StatelessWidget {
   const StageInfoAndSegmentBar({super.key});
@@ -14,14 +13,13 @@ class StageInfoAndSegmentBar extends StatelessWidget {
       builder: (context, state) {
         return Column(
           children: [
-            // Segment Bar
             SizedBox(
               height: 4,
               child: Row(
                 children: List.generate(state.stages.length, (index) {
                   Color color;
                   if (index < state.currentStageIndex) {
-                    color = theme.primaryColor;
+                    color = theme.colorScheme.primaryContainer;
                   } else if (index == state.currentStageIndex) {
                     color = theme.primaryColor;
                   } else {

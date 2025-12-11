@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:mars_workout_app/logic/bloc/timer/timer_bloc.dart';
-import 'package:mars_workout_app/logic/bloc/timer/timer_event.dart';
-import 'package:mars_workout_app/logic/bloc/timer/timer_state.dart';
 
 class TimerControls extends StatelessWidget {
   const TimerControls({super.key});

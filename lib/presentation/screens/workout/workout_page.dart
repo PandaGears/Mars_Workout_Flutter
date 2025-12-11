@@ -5,10 +5,7 @@ import 'package:mars_workout_app/core/services/audio_service.dart';
 import 'package:mars_workout_app/data/models/workout_model.dart';
 import 'package:mars_workout_app/data/repositories/workouts/workout_repository.dart';
 import 'package:mars_workout_app/logic/bloc/plan/plan_bloc.dart';
-import 'package:mars_workout_app/logic/bloc/plan/plan_event.dart';
 import 'package:mars_workout_app/logic/bloc/timer/timer_bloc.dart';
-import 'package:mars_workout_app/logic/bloc/timer/timer_event.dart';
-import 'package:mars_workout_app/logic/bloc/timer/timer_state.dart';
 import 'package:mars_workout_app/presentation/screens/workout/completion/workout_completion_screen.dart';
 import 'package:mars_workout_app/presentation/screens/workout/workout_screen.dart';
 

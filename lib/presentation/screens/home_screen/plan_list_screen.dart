@@ -3,8 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:mars_workout_app/core/constants/enums/workout_type.dart';
 import 'package:mars_workout_app/data/repositories/workouts/workout_repository.dart';
 import 'package:mars_workout_app/logic/bloc/plan/plan_bloc.dart';
-import 'package:mars_workout_app/logic/bloc/plan/plan_state.dart';
-import 'package:mars_workout_app/presentation/screens/details/plan_details.dart';
+import 'package:mars_workout_app/presentation/screens/home_screen/details/plan_details.dart';
 
 class PlanListScreen extends StatelessWidget {
   final WorkoutType workoutType;

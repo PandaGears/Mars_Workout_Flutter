@@ -1,8 +1,7 @@
 // lib/logic/bloc/plan/plan_state.dart
-import 'package:equatable/equatable.dart';
-import 'package:mars_workout_app/core/constants/enums/workout_type.dart';
+part of 'plan_bloc.dart';
 
-class PlanState extends Equatable {
+final class PlanState extends Equatable {
   // Key: WorkoutType.toString() (e.g., "WorkoutType.cycling")
   // Value: Plan ID (e.g., "bn_150km_classic")
   final Map<String, String> activePlans;

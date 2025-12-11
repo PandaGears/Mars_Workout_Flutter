@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:mars_workout_app/logic/bloc/timer/timer_bloc.dart';
-import 'package:mars_workout_app/logic/bloc/timer/timer_state.dart';
 
 class PrepOverlay extends StatelessWidget {
   const PrepOverlay({super.key});
@@ -12,42 +11,32 @@ class PrepOverlay extends StatelessWidget {
 
     return BlocBuilder<TimerBloc, TimerState>(
       builder: (context, state) {
-        // 1. Identify if this is a REST stage
         final stageName = state.currentStage.name.toLowerCase();
         final isRestStage = stageName.contains('rest') ||
             stageName.contains('recover');
 
-        // 2. Show Overlay if we are in PREP or REST
         if (!state.isPrep && !isRestStage) return const SizedBox.shrink();
 
-        // 3. Configuration based on Mode
         final isPrep = state.isPrep;
 
-        // Duration
         final maxDuration = isPrep
             ?  Duration(seconds: state.currentStageIndex > 0 ? 10 : 5)
             : state.currentStage.duration;
 
-        // Timer Text
         final timeLeft = maxDuration - state.elapsed;
         final secondsDisplay = timeLeft.inSeconds < 0 ? 0 : timeLeft.inSeconds;
 
-        // Progress: FILLS UP (0.0 -> 1.0)
         final progress = maxDuration.inMilliseconds > 0
             ? state.elapsed.inMilliseconds / maxDuration.inMilliseconds
             : 0.0;
 
-        // Labels & Colors
         final titleText = isPrep ? "GET READY" : "REST";
         final activeColor = isPrep ? Colors.orange : Colors.blueAccent; // Distinct color for rest
 
-        // "Next Up" Logic
         String nextUpName = "";
         if (isPrep) {
-          // In Prep, the "current" stage in the state is the one we are about to start
           nextUpName = state.currentStage.name;
         } else {
-          // In Rest, we look ahead to the next stage in the list
           final nextIndex = state.currentStageIndex + 1;
           if (nextIndex < state.stages.length) {
             nextUpName = state.stages[nextIndex].name;
@@ -57,8 +46,7 @@ class PrepOverlay extends StatelessWidget {
         }
 
         return Container(
-          // Darker background overlay
-          color: isRestStage ? Colors.lightBlueAccent : Colors.black.withValues(alpha: 0.8),
+          color: isRestStage ? Colors.lightBlueAccent : Colors.black.withValues(alpha: 0.9),
           width: double.infinity,
           height: double.infinity,
           child: Column(

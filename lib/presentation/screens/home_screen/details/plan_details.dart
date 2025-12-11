@@ -2,8 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:mars_workout_app/data/models/training_plan.dart';
 import 'package:mars_workout_app/logic/bloc/plan/plan_bloc.dart';
-import 'package:mars_workout_app/logic/bloc/plan/plan_event.dart';
-import 'package:mars_workout_app/logic/bloc/plan/plan_state.dart';
 import 'package:mars_workout_app/presentation/screens/workout/selection/workout_selection_screen.dart';
 import 'package:mars_workout_app/data/repositories/workouts/workout_repository.dart';
 import 'package:mars_workout_app/presentation/screens/workout/workout_preview/workout_preview_screen.dart';
@@ -94,7 +92,7 @@ class PlanDetailScreen extends StatelessWidget {
                     // Visual cue: Slight fade if inactive, but still readable
                     opacity: isActive ? 1.0 : 0.8,
                     child: ListView.builder(
-                      padding: const EdgeInsets.only(bottom: 20, left: 20, right: 20),
+                      padding: const EdgeInsets.only(bottom: 20,),
                       itemCount: plan.weeks.length,
                       itemBuilder: (context, index) {
                         final week = plan.weeks[index];
@@ -133,18 +131,19 @@ class PlanDetailScreen extends StatelessWidget {
 
                         return Theme(
                           data: theme.copyWith(dividerColor: Colors.transparent),
+
                           child: Padding(
                             padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
                             child: Card(
                               elevation: 0,
+                              clipBehavior: Clip.antiAlias,
                               color: backgroundColor ?? theme.cardColor,
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(12),
                                 side: isWeekComplete ? const BorderSide(color: Colors.green, width: 1) : BorderSide.none,
                               ),
                               child: ExpansionTile(
-                                // Only disable expansion if week is legitimately locked by progression
-                                // If plan is inactive, we allow expansion to preview content
+                                clipBehavior: Clip.antiAlias,
                                 enabled: !isWeekLocked,
                                 leading: leadingIcon,
                                 textColor: titleColor,
@@ -234,10 +233,6 @@ class PlanDetailScreen extends StatelessWidget {
             TextButton(
               child: const Text("Reset", style: TextStyle(color: Colors.red)),
               onPressed: () {
-                // Trigger the Bloc Event
-                // Note: We use 'context' from the parent build method,
-                // assuming PlanDetailScreen is inside the BlocProvider scope.
-                // If dialogContext doesn't have the provider, use the captured 'context'
                 Navigator.of(dialogContext).pop();
 
                 // Using the context passed to the method (from the widget build)

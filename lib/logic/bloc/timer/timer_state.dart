@@ -1,6 +1,4 @@
-import 'package:equatable/equatable.dart';
-import 'package:mars_workout_app/data/models/workout_model.dart';
-
+part of 'timer_bloc.dart';
 
 class TimerState extends Equatable {
   final List<WorkoutStage> stages;

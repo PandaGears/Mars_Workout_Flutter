@@ -4,7 +4,6 @@ import 'package:mars_workout_app/core/constants/enums/workout_type.dart';
 import 'package:mars_workout_app/data/models/workout_model.dart';
 import 'package:mars_workout_app/data/repositories/misc/gif_repository.dart';
 import 'package:mars_workout_app/logic/bloc/timer/timer_bloc.dart';
-import 'package:mars_workout_app/logic/bloc/timer/timer_state.dart';
 import 'package:mars_workout_app/presentation/screens/workout/widgets/stage_info/stage_info_and_segment_bar.dart';
 import 'package:mars_workout_app/presentation/screens/workout/widgets/timer/linear_timer_display.dart';
 import 'package:mars_workout_app/presentation/screens/workout/widgets/timer/prep_overlay.dart'; // Import this
@@ -40,7 +39,6 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
     final theme = Theme.of(context);
 
     return Scaffold(
-      backgroundColor: Colors.white,
       appBar: AppBar(
         title: Text(widget.workout.title),
         elevation: 0,
@@ -74,7 +72,7 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
                           return Center(child: CircularProgressIndicator(color: theme.primaryColor));
                         },
                         errorBuilder: (context, error, stackTrace) =>
-                        const Center(child: Icon(Icons.fitness_center, size: 64, color: Colors.grey)),
+                        Center(child: Icon(Icons.fitness_center, size: 64, color: Colors.grey.shade100)),
                       ),
                     );
                   },
@@ -85,6 +83,7 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
                 flex: 6,
                 child: Container(
                   padding: const EdgeInsets.fromLTRB(24, 32, 24, 24),
+                  clipBehavior: Clip.antiAlias,
                   decoration: BoxDecoration(
                     color: theme.colorScheme.surface,
                     borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
