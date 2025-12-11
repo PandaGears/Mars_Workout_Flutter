@@ -19,6 +19,8 @@ class WorkoutRepository {
       insideIndoorIntermediatePlan(),
       thePetePlan(),
       kettlebellPlan(),
-      plan015KettlebellProgram(),];
+      plan015KettlebellProgram(),
+      nourishMoveLoveHiitPlan(),
+    ];
   }
 }

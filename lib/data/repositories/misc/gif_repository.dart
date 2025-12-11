@@ -35,20 +35,27 @@ class GifRepository {
     }
 
     if (workoutType == WorkoutType.kettleBell) {
-      if (stage.contains('halos') || stage.contains('clean')) {
-        return 'https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExbDAxNzRobnllNDcxOWN2Y2ZsYjR4a2UycDBwejJoYTZ4bHZiOGV6NiZlcD12MV9naWZzX3NlYXJjaCZjdD1n/1L8iyggFyXAJjcZiRI/giphy.gif';
+      if (stage.contains('halos')) {
+        return 'https://www.garagegymreviews.com/wp-content/uploads/2023/04/kettlebell-halo.gif';
       }
+      else if (stage.contains('clean')) {
+        return 'https://i0.wp.com/www.strengthlog.com/wp-content/uploads/2025/03/Kettlebell-Clean.gif';
+      }
+
       else if (stage.contains('slingshots')) {
-        return 'https://gymvisual.com/img/p/1/6/9/0/3/16903.gif';
+        return 'https://www.garagegymreviews.com/wp-content/uploads/2023/05/kettlebell-slingshot.gif';
       }
       else if (stage.contains('swings')) {
-        return 'https://media.giphy.com/media/v1.Y2lkPWVjZjA1ZTQ3Z201bjNudHExaXk0dG9zenQ5eThmNHkzNDEwZXZlOXB4bTAzNG5rZyZlcD12MV9naWZzX3NlYXJjaCZjdD1n/7m8d8biUYCgyHRo2uJ/giphy.gif';
+        return 'https://www.garagegymreviews.com/wp-content/uploads/2022/07/kettlebell-swing-gif.gif';
       }
-      else if (stage.contains('cool')) {
-        return 'https://media.giphy.com/media/v1.Y2lkPWVjZjA1ZTQ3MzhwaXdtOXlzcTRtbXlleXpjNmpoM3dsZDdpMDA1anhua2drcmdsNyZlcD12MV9naWZzX3NlYXJjaCZjdD1n/rnvGRog1qklLALH9F8/giphy.gif';
+      else if (stage.contains('squat')) {
+        return 'https://www.garagegymreviews.com/wp-content/uploads/2023/04/kettlbell-goblet-squat.gif';
       }
-      else if (stage.contains('squat') || stage.contains('deadlift')) {
-        return 'https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExbmw1MzUyb3BpZDZ5enp6OGgxMmZnbmtrbXNzdWQwbTBwOTNwZm5zNSZlcD12MV9naWZzX3NlYXJjaCZjdD1n/MdRI2tmI5e7HX7P76U/giphy.gif';
+      else if (stage.contains('deadlift')) {
+        return 'https://www.garagegymreviews.com/wp-content/uploads/2023/11/Kettlebell-sumo-deadlift.gif';
+      }
+      else if (stage.contains('overhead')) {
+        return 'https://www.garagegymreviews.com/wp-content/uploads/2023/04/Kettlebell-Press-1.gif';
       }
       else if (stage.contains('lunge')) {
         return 'https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExZW16N2NwNDF4cnVxZGN2NjZ0eWM0MjI3a3FkaTZpbHhhN3RiNnk5bSZlcD12MV9naWZzX3NlYXJjaCZjdD1n/58mTBYxhbSUJq/giphy.gif';
@@ -56,7 +63,7 @@ class GifRepository {
       else if (stage.contains('pushup') || stage.contains('push-up') || stage.contains('press')) {
         return 'https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExMW8waGFuamNpcmY4bW44OHVzcGhxaTF5bjhwZmVuam8zZHNyZHBqYSZlcD12MV9naWZzX3NlYXJjaCZjdD1n/xPsKvp0HaXD2FJ4g0J/giphy.gif';
       }
-      else if (stage.contains('rest') || stage.contains('recovery')) {
+      else if (stage.contains('rest') || stage.contains('recovery') || stage.contains('cool')) {
         return 'https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExN2NzbXcwNnYwZHlka3Q4a3lqdTNlMXcza3c5eWp4cXptMmI5a252dSZlcD12MV9naWZzX3NlYXJjaCZjdD1n/ZGmne7bRFBawmz5Gcr/giphy.gif';
       }
     }
