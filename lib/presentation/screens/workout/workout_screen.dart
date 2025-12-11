@@ -7,6 +7,7 @@ import 'package:mars_workout_app/logic/bloc/timer/timer_bloc.dart';
 import 'package:mars_workout_app/logic/bloc/timer/timer_state.dart';
 import 'package:mars_workout_app/presentation/screens/workout/widgets/stage_info/stage_info_and_segment_bar.dart';
 import 'package:mars_workout_app/presentation/screens/workout/widgets/timer/linear_timer_display.dart';
+import 'package:mars_workout_app/presentation/screens/workout/widgets/timer/prep_overlay.dart'; // Import this
 import 'package:mars_workout_app/presentation/screens/workout/widgets/timer/timer_widget.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
@@ -45,63 +46,72 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
         elevation: 0,
         foregroundColor: Colors.black,
       ),
-      body: Column(
+      // WRAP BODY IN STACK
+      body: Stack(
         children: [
-          Expanded(
-            flex: 4,
-            child: BlocBuilder<TimerBloc, TimerState>(
-              buildWhen: (previous, current) =>
-              previous.currentStageIndex != current.currentStageIndex,
-              builder: (context, state) {
-                final gifUrl = GifRepository.getGifUrl(
-                    widget.workoutType,
-                    state.currentStage.name
-                );
+          // 1. ORIGINAL WORKOUT UI (Bottom Layer)
+          Column(
+            children: [
+              Expanded(
+                flex: 4,
+                child: BlocBuilder<TimerBloc, TimerState>(
+                  buildWhen: (previous, current) =>
+                  previous.currentStageIndex != current.currentStageIndex,
+                  builder: (context, state) {
+                    final gifUrl = GifRepository.getGifUrl(
+                        widget.workoutType,
+                        state.currentStage.name
+                    );
 
-                return Container(
-                  width: double.infinity,
-                  color: Colors.grey.shade100,
-                  child: Image.network(
-                    gifUrl,
-                    fit: BoxFit.contain,
-                    loadingBuilder: (context, child, loadingProgress) {
-                      if (loadingProgress == null) return child;
-                      return Center(child: CircularProgressIndicator(color: theme.primaryColor));
-                    },
-                    errorBuilder: (context, error, stackTrace) =>
-                    const Center(child: Icon(Icons.fitness_center, size: 64, color: Colors.grey)),
+                    return Container(
+                      width: double.infinity,
+                      color: Colors.grey.shade100,
+                      child: Image.network(
+                        gifUrl,
+                        fit: BoxFit.contain,
+                        loadingBuilder: (context, child, loadingProgress) {
+                          if (loadingProgress == null) return child;
+                          return Center(child: CircularProgressIndicator(color: theme.primaryColor));
+                        },
+                        errorBuilder: (context, error, stackTrace) =>
+                        const Center(child: Icon(Icons.fitness_center, size: 64, color: Colors.grey)),
+                      ),
+                    );
+                  },
+                ),
+              ),
+
+              Expanded(
+                flex: 6,
+                child: Container(
+                  padding: const EdgeInsets.fromLTRB(24, 32, 24, 24),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.surface,
+                    borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.05),
+                        blurRadius: 20,
+                        offset: const Offset(0, -5),
+                      )
+                    ],
                   ),
-                );
-              },
-            ),
-          ),
-      
-          Expanded(
-            flex: 6,
-            child: Container(
-              padding: const EdgeInsets.fromLTRB(24, 32, 24, 24),
-              decoration: BoxDecoration(
-                color: theme.colorScheme.surface,
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.05),
-                    blurRadius: 20,
-                    offset: const Offset(0, -5),
-                  )
-                ],
+                  child: Column(
+                    children: [
+                      const StageInfoAndSegmentBar(),
+                      const Spacer(),
+                      const LinearTimerDisplay(),
+                      const SizedBox(height: 16),
+                      TimerControls(),
+                    ],
+                  ),
+                ),
               ),
-              child: Column(
-                children: [
-                  const StageInfoAndSegmentBar(),
-                  const Spacer(),
-                  const LinearTimerDisplay(),
-                  const SizedBox(height: 16),
-                  TimerControls(),
-                ],
-              ),
-            ),
+            ],
           ),
+
+          // 2. PREP OVERLAY (Top Layer)
+          const PrepOverlay(),
         ],
       ),
     );

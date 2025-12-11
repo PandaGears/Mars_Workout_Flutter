@@ -8,9 +8,6 @@ class PlanBloc extends HydratedBloc<PlanEvent, PlanState> {
 
     on<StartPlan>((event, emit) {
       final updatedMap = Map<String, String>.from(state.activePlans);
-
-      // CRITICAL: Use the Type as the key.
-      // This ensures if you start "Cycling Plan B", it overwrites "Cycling Plan A".
       updatedMap[event.type.toString()] = event.planId;
 
       emit(state.copyWith(activePlans: updatedMap));
@@ -24,10 +21,24 @@ class PlanBloc extends HydratedBloc<PlanEvent, PlanState> {
       emit(state.copyWith(completedDayIds: updatedList));
     });
 
-    // Reset everything
-    on<ResetProgress>((event, emit) {
-      emit(const PlanState(activePlans: {}, completedDayIds: []));
+    on<ResetPlanProgress>((event, emit) {
+      // 1. Gather all day IDs belonging to the target plan
+      final planDayIds = <String>{};
+      for (var week in event.plan.weeks) {
+        for (var day in week.days) {
+          planDayIds.add(day.id);
+        }
+      }
+
+      // 2. Filter the current list to exclude those IDs
+      final updatedCompletedIds = state.completedDayIds
+          .where((id) => !planDayIds.contains(id))
+          .toList();
+
+      // 3. Emit new state (Progress cleared, but plan remains Active)
+      emit(state.copyWith(completedDayIds: updatedCompletedIds));
     });
+
   }
 
   @override

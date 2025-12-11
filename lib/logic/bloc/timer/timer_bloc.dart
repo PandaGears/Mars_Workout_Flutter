@@ -22,7 +22,7 @@ class TimerBloc extends Bloc<TimerEvent, TimerState> {
   }
 
   void _onStartTimer(StartTimer event, Emitter<TimerState> emit) {
-    if (state.isRunning) return; // Already running
+    if (state.isRunning) return;
 
     _tickerSubscription?.cancel();
     _tickerSubscription = Stream.periodic(const Duration(seconds: 1), (x) => x).listen((tick) => add(TimerTicked(state.elapsed + const Duration(seconds: 1))));
@@ -43,7 +43,7 @@ class TimerBloc extends Bloc<TimerEvent, TimerState> {
   // Inside _onTimerTicked method:
 
   void _onTimerTicked(TimerTicked event, Emitter<TimerState> emit) {
-    const int prepDurationSeconds = 5; // 5 Seconds "Get Ready" time
+    final int prepDurationSeconds = (state.currentStageIndex > 0) ? 10 : 5; // 5 Seconds "Get Ready" time
 
     // 1. Handle "Get Ready" Phase
     if (state.isPrep) {
@@ -67,6 +67,7 @@ class TimerBloc extends Bloc<TimerEvent, TimerState> {
 
 // Inside _onNextStage method:
   void _onNextStage(NextStage event, Emitter<TimerState> emit) {
+    // 1. Check if workout is finished
     if (state.isLastStage) {
       _tickerSubscription?.cancel();
       // Force elapsed to duration so UI shows 100% complete before navigating
@@ -74,13 +75,21 @@ class TimerBloc extends Bloc<TimerEvent, TimerState> {
       return;
     }
 
-    // Move to next stage, BUT start in "Prep" mode again
-    // Exception: If next stage is "Rest", maybe skip prep?
-    // For now, let's keep it simple: Prep before everything.
+    // 2. Identify the next stage
+    final nextIndex = state.currentStageIndex + 1;
+    final nextStage = state.stages[nextIndex];
+
+    // 3. Check if the next stage is a "Rest" stage
+    // We check for "rest" or "recover" to be safe
+    final isRestStage = nextStage.name.toLowerCase().contains('rest') ||
+        nextStage.name.toLowerCase().contains('recover') || nextStage.name.toLowerCase().contains('cool');
+
+    // 4. Transition
     emit(state.copyWith(
-      currentStageIndex: state.currentStageIndex + 1,
+      currentStageIndex: nextIndex,
       elapsed: Duration.zero,
-      isPrep: true, // Reset to Get Ready mode
+      // If it is a rest stage, SKIP prep (isPrep = false).
+      // Otherwise, show prep (isPrep = true).
+      isPrep: !isRestStage,
     ));
-  }
-}
+  }}

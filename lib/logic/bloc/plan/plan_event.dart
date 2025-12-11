@@ -1,5 +1,6 @@
 import 'package:equatable/equatable.dart';
 import 'package:mars_workout_app/core/constants/enums/workout_type.dart';
+import 'package:mars_workout_app/data/models/training_plan.dart';
 
 abstract class PlanEvent extends Equatable {
   const PlanEvent();
@@ -22,6 +23,11 @@ class CompleteDay extends PlanEvent {
 class MarkDayAsCompleted extends PlanEvent {
   final String dayId;
   const MarkDayAsCompleted(this.dayId);
+}
+
+class ResetPlanProgress extends PlanEvent {
+  final TrainingPlan plan;
+  const ResetPlanProgress(this.plan);
 }
 
 class ResetProgress extends PlanEvent {}

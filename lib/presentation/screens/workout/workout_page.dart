@@ -7,6 +7,7 @@ import 'package:mars_workout_app/data/repositories/workouts/workout_repository.d
 import 'package:mars_workout_app/logic/bloc/plan/plan_bloc.dart';
 import 'package:mars_workout_app/logic/bloc/plan/plan_event.dart';
 import 'package:mars_workout_app/logic/bloc/timer/timer_bloc.dart';
+import 'package:mars_workout_app/logic/bloc/timer/timer_event.dart';
 import 'package:mars_workout_app/logic/bloc/timer/timer_state.dart';
 import 'package:mars_workout_app/presentation/screens/workout/completion/workout_completion_screen.dart';
 import 'package:mars_workout_app/presentation/screens/workout/workout_screen.dart';
@@ -21,17 +22,9 @@ class WorkoutPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return BlocProvider<TimerBloc>(
-      create: (context) => TimerBloc(workout.stages),
+      create: (context) => TimerBloc(workout.stages)..add(StartTimer()),
       child: BlocListener<TimerBloc, TimerState>(
         listener: (context, state) {
-          final totalDuration = state.currentStage.duration.inSeconds;
-          final elapsed = state.elapsed.inSeconds;
-          final timeLeft = totalDuration - elapsed;
-
-          // 1. Play Countdown
-          if (!state.isPrep && timeLeft <= 3 && timeLeft > 0) {
-            SoundService().playCountdown();
-          }
 
           // 2. Workout Finished Logic
           if (state.isFinished) {
