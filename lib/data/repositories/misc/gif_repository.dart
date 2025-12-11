@@ -43,13 +43,16 @@ class GifRepository {
       else if (stage.contains('hollow') || stage.contains('twist') || stage.contains('russian')) {
         return 'https://media1.popsugar-assets.com/files/thumbor/2iKsfM5PV4WjulvNvZ3hmkNc3Dw/fit-in/1024x1024/filters:format_auto-!!-:strip_icc-!!-/2020/12/01/844/n/1922729/eda91fe4b67938a4_IMB_MVu242/i/Circuit-4-Exercise-4-Russian-Twist.GIF';
       }
+      else if (stage.contains('staggered dl + clean')) {
+        return 'https://www.nourishmovelove.com/wp-content/uploads/2023/08/Deadlift-and-Kettlebell-Clean-and-Front-Squat-and-Shoulder-Press.gif';
+      }
       else if (stage.contains('row')) {
         return 'https://www.nourishmovelove.com/wp-content/uploads/2023/08/Split-Lunge-Hold-and-Single-Arm-Row.gif';
       }
       else if (stage.contains('pick up squats')) {
         return 'https://www.nourishmovelove.com/wp-content/uploads/2023/08/Kettlebell-Pick-Up-Squats.gif';
       }
-      else if (stage.contains('staggered')) {
+      else if (stage.contains('staggered deadlift')) {
         return 'https://www.nourishmovelove.com/wp-content/uploads/2023/08/Staggered-Deadlift.gif';
       }
       else if (stage.contains('alt clean & front squat')) {
