@@ -14,6 +14,7 @@ class TimerBloc extends Bloc<TimerEvent, TimerState> {
     on<PauseTimer>(_onPauseTimer);
     on<ResetTimer>(_onResetTimer);
     on<NextStage>(_onNextStage);
+    on<RestoreTimer>(_onRestoreTimer);
     on<TimerTicked>(_onTimerTicked);
   }
 
@@ -42,24 +43,16 @@ class TimerBloc extends Bloc<TimerEvent, TimerState> {
     emit(TimerState.initial(state.stages));
   }
 
-  // Inside _onTimerTicked method:
+  void _onRestoreTimer(RestoreTimer event, Emitter<TimerState> emit) {
+    _tickerSubscription?.cancel();
+    emit(state.copyWith(
+      currentStageIndex: event.currentStageIndex,
+      elapsed: event.elapsed,
+      isRunning: false, // Start paused
+    ));
+  }
 
   void _onTimerTicked(TimerTicked event, Emitter<TimerState> emit) {
-    final int prepDurationSeconds = (state.currentStageIndex > 0) ? 10 : 5; // 5 Seconds "Get Ready" time
-
-    // 1. Handle "Get Ready" Phase
-    if (state.isPrep) {
-      if (state.elapsed.inSeconds >= prepDurationSeconds) {
-        // Prep is done! Switch to Work.
-        emit(state.copyWith(isPrep: false, elapsed: Duration.zero));
-      } else {
-        // Continue Prep countdown
-        emit(state.copyWith(elapsed: event.elapsed));
-      }
-      return;
-    }
-
-    // 2. Handle "Work" Phase
     if (event.elapsed >= state.currentStage.duration) {
       add(NextStage());
     } else {
@@ -67,9 +60,8 @@ class TimerBloc extends Bloc<TimerEvent, TimerState> {
     }
   }
 
-  // Inside _onNextStage method:
   void _onNextStage(NextStage event, Emitter<TimerState> emit) {
-    // 1. Check if workout is finished
+    // Check if workout is finished
     if (state.isLastStage) {
       _tickerSubscription?.cancel();
       // Force elapsed to duration so UI shows 100% complete before navigating
@@ -77,22 +69,11 @@ class TimerBloc extends Bloc<TimerEvent, TimerState> {
       return;
     }
 
-    // 2. Identify the next stage
-    final nextIndex = state.currentStageIndex + 1;
-    final nextStage = state.stages[nextIndex];
-
-    // 3. Check if the next stage is a "Rest" stage
-    // We check for "rest" or "recover" to be safe
-    final isRestStage = nextStage.name.toLowerCase().contains('rest') || nextStage.name.toLowerCase().contains('recover') || nextStage.name.toLowerCase().contains('cool');
-
-    // 4. Transition
+    // Move to next stage
     emit(
       state.copyWith(
-        currentStageIndex: nextIndex,
+        currentStageIndex: state.currentStageIndex + 1,
         elapsed: Duration.zero,
-        // If it is a rest stage, SKIP prep (isPrep = false).
-        // Otherwise, show prep (isPrep = true).
-        isPrep: !isRestStage,
       ),
     );
   }

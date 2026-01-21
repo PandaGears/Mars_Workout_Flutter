@@ -15,6 +15,19 @@ class ResetTimer extends TimerEvent {}
 
 class NextStage extends TimerEvent {}
 
+class RestoreTimer extends TimerEvent {
+  final int currentStageIndex;
+  final Duration elapsed;
+
+  const RestoreTimer({
+    required this.currentStageIndex,
+    required this.elapsed,
+  });
+
+  @override
+  List<Object> get props => [currentStageIndex, elapsed];
+}
+
 class TimerTicked extends TimerEvent {
   final Duration elapsed;
 

@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:mars_workout_app/core/constants/enums/workout_type.dart';
+import 'package:mars_workout_app/data/models/workout_helper.dart';
 import 'package:mars_workout_app/data/models/workout_model.dart';
 import 'package:mars_workout_app/logic/bloc/plan/plan_bloc.dart';
+import 'package:mars_workout_app/logic/bloc/timer/timer_bloc.dart';
+import 'package:mars_workout_app/logic/bloc/workout_session/workout_session_bloc.dart';
+import 'package:mars_workout_app/logic/cubit/workout_video_cubit.dart';
 import 'package:mars_workout_app/presentation/screens/workout/workout_page.dart';
 
 class WorkoutPreviewScreen extends StatelessWidget {
@@ -26,13 +30,28 @@ class WorkoutPreviewScreen extends StatelessWidget {
             height: 56,
             child: ElevatedButton.icon(
               onPressed: () {
+                // Add countdown stages to the workout
+                final stagesWithCountdown = WorkoutHelper.addCountdownStages(workout.stages);
+                final workoutWithCountdown = Workout(
+                  title: workout.title,
+                  description: workout.description,
+                  stages: stagesWithCountdown,
+                );
+                
                 // Navigate to the actual Timer/Video screen
                 Navigator.pushReplacement(
                   context,
                   MaterialPageRoute(
-                    builder: (_) => BlocProvider.value(
-                      value: BlocProvider.of<PlanBloc>(context),
-                      child: WorkoutPage(workout: workout, planDayId: planDayId, workoutType: workoutType),
+                    builder: (_) => MultiBlocProvider(
+                      providers: [
+                        BlocProvider.value(value: context.read<PlanBloc>()),
+                        BlocProvider.value(value: context.read<WorkoutSessionBloc>()),
+                        BlocProvider<TimerBloc>(
+                          create: (_) => TimerBloc(stagesWithCountdown)..add(StartTimer()),
+                        ),
+                        BlocProvider<WorkoutVideoCubit>(create: (_) => WorkoutVideoCubit()),
+                      ],
+                      child: WorkoutPage(workout: workoutWithCountdown, planDayId: planDayId, workoutType: workoutType),
                     ),
                   ),
                 );

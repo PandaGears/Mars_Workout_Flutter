@@ -94,9 +94,7 @@ class WorkoutCompletedScreen extends StatelessWidget {
                             height: 56,
                             child: ElevatedButton(
                               onPressed: () {
-                                Navigator.of(context)
-                                  ..pop()
-                                  ..pop();
+                                Navigator.of(context).popUntil((route) => route.isFirst);
                               },
                               style: ElevatedButton.styleFrom(backgroundColor: primaryColor),
                               child: const Text("FINISH"),
