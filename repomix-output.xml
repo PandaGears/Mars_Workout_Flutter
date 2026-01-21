@@ -183,7 +183,9 @@ lib/
   data/
     models/
       training_plan.dart
+      workout_helper.dart
       workout_model.dart
+      workout_session.dart
     repositories/
       misc/
         gif_repository.dart
@@ -204,6 +206,10 @@ lib/
         timer_bloc.dart
         timer_event.dart
         timer_state.dart
+      workout_session/
+        workout_session_bloc.dart
+        workout_session_event.dart
+        workout_session_state.dart
     cubit/
       workout_video_cubit.dart
   presentation/
@@ -226,13 +232,16 @@ lib/
             stage_info_and_segment_bar.dart
           timer/
             linear_timer_display.dart
-            prep_overlay.dart
             timer_widget.dart
           workout_video_player.dart
         workout_preview/
           workout_preview_screen.dart
         workout_page.dart
         workout_screen.dart
+    widgets/
+      info_row.dart
+      resume_workout_dialog.dart
+      session_info_card.dart
 linux/
   flutter/
     CMakeLists.txt
@@ -324,489 +333,15 @@ windows/
 .gitignore
 .metadata
 analysis_options.yaml
+COUNTDOWN_STAGES.md
 pubspec.lock
 pubspec.yaml
 README.md
+RESUME_WORKOUT_FEATURE.md
 </directory_structure>
 
 <files>
 This section contains the contents of the repository's files.
-
-<file path="lib/data/repositories/misc/video_repository.dart">
-import '../../../core/constants/enums/workout_type.dart';
-
-class VideoRepository {
-  /// Returns a YouTube video id (the `v=` value) for a given workout type.
-  /// Return null when no video is available.
-  static String? getYoutubeVideoId(WorkoutType workoutType) {
-    switch (workoutType) {
-      case WorkoutType.cycling:
-        // TODO: replace with your preferred cycling workout video
-        return '1V4cAqf9m6c';
-      case WorkoutType.rowing:
-        // TODO: replace with your preferred rowing workout video
-        return 'zQ82RYIFLN8';
-      case WorkoutType.elliptical:
-        // TODO: replace with your preferred elliptical workout video
-        return 'f1g1L3PqI3k';
-      case WorkoutType.other:
-        return null;
-    }
-  }
-}
-</file>
-
-<file path="lib/logic/cubit/workout_video_cubit.dart">
-import 'package:hydrated_bloc/hydrated_bloc.dart';
-
-/// Stores a user-chosen YouTube URL/ID per workout session (keyed by planDayId).
-class WorkoutVideoCubit extends HydratedCubit<Map<String, String>> {
-  WorkoutVideoCubit() : super(const {});
-
-  void setVideoForSession(String sessionKey, String urlOrId) {
-    final cleanedKey = sessionKey.trim();
-    if (cleanedKey.isEmpty) return;
-    final updated = Map<String, String>.from(state);
-    updated[cleanedKey] = urlOrId.trim();
-    emit(updated);
-  }
-
-  void clearVideoForSession(String sessionKey) {
-    if (!state.containsKey(sessionKey)) return;
-    final updated = Map<String, String>.from(state)..remove(sessionKey);
-    emit(updated);
-  }
-
-  String? getVideoForSession(String sessionKey) => state[sessionKey];
-
-  @override
-  Map<String, String>? fromJson(Map<String, dynamic> json) {
-    return json.map((key, value) => MapEntry(key, value as String));
-  }
-
-  @override
-  Map<String, dynamic>? toJson(Map<String, String> state) {
-    return Map<String, dynamic>.from(state);
-  }
-}
-</file>
-
-<file path="lib/presentation/screens/workout/widgets/workout_video_player.dart">
-import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:mars_workout_app/core/constants/enums/workout_type.dart';
-import 'package:mars_workout_app/data/models/workout_model.dart';
-import 'package:mars_workout_app/data/repositories/misc/video_repository.dart';
-import 'package:mars_workout_app/logic/bloc/timer/timer_bloc.dart';
-import 'package:mars_workout_app/logic/cubit/workout_video_cubit.dart';
-import 'package:url_launcher/url_launcher.dart';
-import 'package:youtube_player_flutter/youtube_player_flutter.dart';
-
-/// Top-of-screen video section for long workouts:
-/// - Lets the user paste/search a YouTube URL/ID
-/// - Plays inline where the GIF normally sits
-/// - Provides a custom fullscreen experience in portrait.
-class WorkoutVideoSection extends StatefulWidget {
-  final Workout workout;
-  final String planDayId;
-  final WorkoutType workoutType;
-
-  const WorkoutVideoSection({
-    super.key,
-    required this.workout,
-    required this.planDayId,
-    required this.workoutType,
-  });
-
-  @override
-  State<WorkoutVideoSection> createState() => _WorkoutVideoSectionState();
-}
-
-class _WorkoutVideoSectionState extends State<WorkoutVideoSection> {
-  late final String _sessionKey;
-  YoutubePlayerController? _youtubeController;
-  String? _currentVideoId;
-
-  @override
-  void initState() {
-    super.initState();
-    _sessionKey = widget.planDayId.isNotEmpty ? widget.planDayId : widget.workout.title;
-  }
-
-  @override
-  void dispose() {
-    _youtubeController?.dispose();
-    super.dispose();
-  }
-
-  void _ensureYoutubeController(String? videoId) {
-    if (videoId == null) {
-      _youtubeController?.dispose();
-      _youtubeController = null;
-      _currentVideoId = null;
-      return;
-    }
-    if (_currentVideoId == videoId && _youtubeController != null) return;
-
-    _youtubeController?.dispose();
-    _youtubeController = YoutubePlayerController(
-      initialVideoId: videoId,
-      flags: const YoutubePlayerFlags(
-        autoPlay: false,
-        mute: false,
-        enableCaption: true,
-        controlsVisibleAtStart: false,
-      ),
-    );
-    _currentVideoId = videoId;
-  }
-
-  Future<void> _openYoutubeSearch(String query) async {
-    final search = Uri.parse('https://www.youtube.com/results?search_query=${Uri.encodeQueryComponent(query)}');
-    await launchUrl(search, mode: LaunchMode.externalApplication);
-  }
-
-  String? _extractVideoId(String? value) {
-    if (value == null) return null;
-    final trimmed = value.trim();
-    if (trimmed.isEmpty) return null;
-
-    // Direct 11-char ID
-    if (RegExp(r'^[a-zA-Z0-9_-]{11}$').hasMatch(trimmed)) return trimmed;
-
-    // youtu.be/<id>
-    final shortMatch = RegExp(r'youtu\.be/([a-zA-Z0-9_-]{11})').firstMatch(trimmed);
-    if (shortMatch != null) return shortMatch.group(1);
-
-    // youtube.com/watch?v=<id>
-    final watchMatch = RegExp(r'[?&]v=([a-zA-Z0-9_-]{11})').firstMatch(trimmed);
-    if (watchMatch != null) return watchMatch.group(1);
-
-    // youtube.com/embed/<id>
-    final embedMatch = RegExp(r'/embed/([a-zA-Z0-9_-]{11})').firstMatch(trimmed);
-    if (embedMatch != null) return embedMatch.group(1);
-
-    return null;
-  }
-
-  Future<void> _promptForVideo({String? initialValue}) async {
-    final controller = TextEditingController(text: initialValue ?? '');
-    final result = await showDialog<String>(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text('Choose YouTube video'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: controller,
-                decoration: const InputDecoration(
-                  labelText: 'Paste YouTube URL or video ID',
-                  hintText: 'https://youtu.be/xxxx or 11-char ID',
-                ),
-              ),
-              const SizedBox(height: 8),
-              Align(
-                alignment: Alignment.centerLeft,
-                child: TextButton.icon(
-                  onPressed: () => _openYoutubeSearch(
-                    controller.text.isNotEmpty ? controller.text : widget.workout.title,
-                  ),
-                  icon: const Icon(Icons.search),
-                  label: const Text('Search on YouTube'),
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            if ((initialValue ?? '').isNotEmpty)
-              TextButton(
-                onPressed: () => Navigator.of(context).pop('CLEAR'),
-                child: const Text('Clear'),
-              ),
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () => Navigator.of(context).pop(controller.text.trim()),
-              child: const Text('Save'),
-            ),
-          ],
-        );
-      },
-    );
-
-    if (!mounted) return;
-    if (result == null) return;
-    if (result == 'CLEAR') {
-      context.read<WorkoutVideoCubit>().clearVideoForSession(_sessionKey);
-      return;
-    }
-    if (result.isEmpty) return;
-    context.read<WorkoutVideoCubit>().setVideoForSession(_sessionKey, result);
-  }
-
-  void _openFullscreenPlayer() {
-    if (_currentVideoId == null) return;
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        fullscreenDialog: true,
-        builder: (ctx) => BlocProvider.value(
-          value: context.read<TimerBloc>(),
-          child: WorkoutVideoFullscreenScreen(
-            videoId: _currentVideoId!,
-            workoutTitle: widget.workout.title,
-            workoutDescription: widget.workout.description,
-          ),
-        ),
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final videoCubit = context.watch<WorkoutVideoCubit>();
-    final savedVideoInput = videoCubit.getVideoForSession(_sessionKey);
-    final fallbackVideoId = VideoRepository.getYoutubeVideoId(widget.workoutType);
-    final chosenInput = savedVideoInput?.isNotEmpty == true ? savedVideoInput : fallbackVideoId;
-    final youtubeVideoId = _extractVideoId(chosenInput);
-
-    _ensureYoutubeController(youtubeVideoId);
-
-    return Container(
-      width: double.infinity,
-      color: Colors.grey.shade100,
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            AspectRatio(
-              aspectRatio: 16 / 9,
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(16),
-                child: youtubeVideoId != null && _youtubeController != null
-                    ? Stack(
-                        children: [
-                          Positioned.fill(
-                            child: YoutubePlayer(
-                              controller: _youtubeController!,
-                              progressIndicatorColor: theme.primaryColor,
-                              bottomActions: const [
-                                CurrentPosition(),
-                                ProgressBar(isExpanded: true),
-                                RemainingDuration(),
-                                PlaybackSpeedButton(),
-                              ],
-                            ),
-                          ),
-                          Positioned(
-                            right: 8,
-                            bottom: 8,
-                            child: IconButton(
-                              icon: const Icon(Icons.fullscreen, color: Colors.white),
-                              onPressed: _openFullscreenPlayer,
-                            ),
-                          ),
-                        ],
-                      )
-                    : Container(
-                        color: Colors.black,
-                        child: Center(
-                          child: Text(
-                            'Add a YouTube URL or ID to play here',
-                            textAlign: TextAlign.center,
-                            style: theme.textTheme.bodyMedium?.copyWith(color: Colors.white70),
-                          ),
-                        ),
-                      ),
-              ),
-            ),
-            const SizedBox(height: 12),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                ElevatedButton.icon(
-                  onPressed: () => _promptForVideo(initialValue: chosenInput),
-                  icon: const Icon(Icons.edit),
-                  label: Text(youtubeVideoId != null ? 'Change video' : 'Set video'),
-                ),
-                const SizedBox(width: 12),
-                TextButton(
-                  onPressed: () => _openYoutubeSearch(widget.workout.title),
-                  child: const Text('Search YouTube'),
-                ),
-              ],
-            ),
-            if (youtubeVideoId == null)
-              Padding(
-                padding: const EdgeInsets.only(top: 8.0),
-                child: Text(
-                  'Paste a YouTube URL or ID to start playback here.',
-                  textAlign: TextAlign.center,
-                  style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey[600]),
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-/// Fullscreen portrait video screen with workout name, info and remaining time.
-class WorkoutVideoFullscreenScreen extends StatefulWidget {
-  final String videoId;
-  final String workoutTitle;
-  final String workoutDescription;
-
-  const WorkoutVideoFullscreenScreen({
-    super.key,
-    required this.videoId,
-    required this.workoutTitle,
-    required this.workoutDescription,
-  });
-
-  @override
-  State<WorkoutVideoFullscreenScreen> createState() => _WorkoutVideoFullscreenScreenState();
-}
-
-class _WorkoutVideoFullscreenScreenState extends State<WorkoutVideoFullscreenScreen> {
-  late final YoutubePlayerController _controller;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = YoutubePlayerController(
-      initialVideoId: widget.videoId,
-      flags: const YoutubePlayerFlags(
-        autoPlay: true,
-        mute: false,
-        enableCaption: true,
-        controlsVisibleAtStart: true,
-      ),
-    );
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  void _showInfo(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: Text(widget.workoutTitle),
-        content: Text(
-          widget.workoutDescription.isNotEmpty ? widget.workoutDescription : 'No description available.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Close'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Scaffold(
-      backgroundColor: Colors.black,
-      body: SafeArea(
-        child: Stack(
-          children: [
-            Center(
-              child: AspectRatio(
-                aspectRatio: 16 / 9,
-                child: YoutubePlayer(
-                  controller: _controller,
-                  progressIndicatorColor: theme.primaryColor,
-                  bottomActions: const [
-                    CurrentPosition(),
-                    ProgressBar(isExpanded: true),
-                    RemainingDuration(),
-                    PlaybackSpeedButton(),
-                  ],
-                ),
-              ),
-            ),
-            Positioned(
-              top: 8,
-              left: 8,
-              child: IconButton(
-                icon: const Icon(Icons.close, color: Colors.white),
-                onPressed: () => Navigator.of(context).pop(),
-              ),
-            ),
-            Positioned(
-              right: 16,
-              bottom: 24,
-              child: BlocBuilder<TimerBloc, TimerState>(
-                builder: (context, state) {
-                  final remaining = state.currentStage.duration - state.elapsed;
-                  final totalSeconds = remaining.inSeconds < 0 ? 0 : remaining.inSeconds;
-                  final minutes = (totalSeconds ~/ 60).toString().padLeft(2, '0');
-                  final seconds = (totalSeconds % 60).toString().padLeft(2, '0');
-
-                  return Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: Colors.black.withValues(alpha: 0.6),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Flexible(
-                              child: Text(
-                                widget.workoutTitle,
-                                overflow: TextOverflow.ellipsis,
-                                style: theme.textTheme.bodyMedium?.copyWith(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 4),
-                            IconButton(
-                              padding: EdgeInsets.zero,
-                              constraints: const BoxConstraints(),
-                              icon: const Icon(Icons.info_outline, size: 18, color: Colors.white),
-                              onPressed: () => _showInfo(context),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          '$minutes:$seconds',
-                          style: theme.textTheme.titleMedium?.copyWith(color: Colors.white),
-                        ),
-                      ],
-                    ),
-                  );
-                },
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-</file>
 
 <file path="android/app/src/debug/AndroidManifest.xml">
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
@@ -1546,6 +1081,210 @@ BASE_URL='https://exercisedb.p.rapidapi.com'
 API_KEY="442a290ce3msh313c809e8de086cp121fa2jsn5dd472ba87eb"
 </file>
 
+<file path="lib/data/models/workout_helper.dart">
+import 'package:mars_workout_app/data/models/workout_model.dart';
+
+/// Helper to inject countdown stages before work stages
+class WorkoutHelper {
+  /// Adds countdown stages to a workout:
+  /// - 5 seconds "Get Ready" at the very beginning
+  /// - 10 seconds "Get Ready" before each subsequent work stage (but not before rest stages)
+  static List<WorkoutStage> addCountdownStages(List<WorkoutStage> originalStages) {
+    if (originalStages.isEmpty) return originalStages;
+
+    final List<WorkoutStage> stagesWithCountdown = [];
+    int workStageCount = 0; // Track which work stage this is
+    
+    for (int i = 0; i < originalStages.length; i++) {
+      final stage = originalStages[i];
+      final stageName = stage.name.toLowerCase();
+      final isRestStage = stageName.contains('rest') || 
+                          stageName.contains('recover') || 
+                          stageName.contains('cool');
+      
+      // Add countdown before non-rest stages
+      if (!isRestStage) {
+        // First work stage gets 5 seconds, subsequent work stages get 10 seconds
+        final countdownDuration = workStageCount == 0 ? 5 : 10;
+        
+        stagesWithCountdown.add(
+          WorkoutStage(
+            name: 'Get Ready',
+            duration: Duration(seconds: countdownDuration),
+            description: 'Next: ${stage.name}',
+          ),
+        );
+        workStageCount++;
+      }
+      
+      // Add the actual stage
+      stagesWithCountdown.add(stage);
+    }
+    
+    return stagesWithCountdown;
+  }
+
+  /// Check if a stage is a countdown stage
+  static bool isCountdownStage(WorkoutStage stage) {
+    return stage.name.toLowerCase() == 'get ready';
+  }
+}
+</file>
+
+<file path="lib/data/repositories/misc/video_repository.dart">
+import '../../../core/constants/enums/workout_type.dart';
+
+class VideoRepository {
+  /// Returns a YouTube video id (the `v=` value) for a given workout type.
+  /// Return null when no video is available.
+  static String? getYoutubeVideoId(WorkoutType workoutType) {
+    switch (workoutType) {
+      case WorkoutType.cycling:
+        // TODO: replace with your preferred cycling workout video
+        return '1V4cAqf9m6c';
+      case WorkoutType.rowing:
+        // TODO: replace with your preferred rowing workout video
+        return 'zQ82RYIFLN8';
+      case WorkoutType.elliptical:
+        // TODO: replace with your preferred elliptical workout video
+        return 'f1g1L3PqI3k';
+      case WorkoutType.other:
+        return null;
+    }
+  }
+}
+</file>
+
+<file path="lib/logic/bloc/workout_session/workout_session_bloc.dart">
+import 'package:equatable/equatable.dart';
+import 'package:hydrated_bloc/hydrated_bloc.dart';
+import 'package:mars_workout_app/data/models/workout_session.dart';
+
+part 'workout_session_event.dart';
+part 'workout_session_state.dart';
+
+/// Manages the saved workout session for resume functionality
+class WorkoutSessionBloc extends HydratedBloc<WorkoutSessionEvent, WorkoutSessionState> {
+  WorkoutSessionBloc() : super(const WorkoutSessionState()) {
+    on<SaveWorkoutSession>(_onSaveWorkoutSession);
+    on<ClearWorkoutSession>(_onClearWorkoutSession);
+  }
+
+  void _onSaveWorkoutSession(SaveWorkoutSession event, Emitter<WorkoutSessionState> emit) {
+    emit(WorkoutSessionState(session: event.session));
+  }
+
+  void _onClearWorkoutSession(ClearWorkoutSession event, Emitter<WorkoutSessionState> emit) {
+    emit(const WorkoutSessionState());
+  }
+
+  @override
+  WorkoutSessionState? fromJson(Map<String, dynamic> json) {
+    try {
+      if (json['session'] == null) {
+        return const WorkoutSessionState();
+      }
+      final session = WorkoutSession.fromJson(json['session']);
+      // Only restore if the session is still valid
+      if (session.isValid()) {
+        return WorkoutSessionState(session: session);
+      }
+      return const WorkoutSessionState();
+    } catch (e) {
+      print('Error loading workout session: $e');
+      return const WorkoutSessionState();
+    }
+  }
+
+  @override
+  Map<String, dynamic>? toJson(WorkoutSessionState state) {
+    try {
+      if (state.session == null) {
+        return null;
+      }
+      return {'session': state.session!.toJson()};
+    } catch (e) {
+      print('Error saving workout session: $e');
+      return null;
+    }
+  }
+}
+</file>
+
+<file path="lib/logic/bloc/workout_session/workout_session_event.dart">
+part of 'workout_session_bloc.dart';
+
+abstract class WorkoutSessionEvent extends Equatable {
+  const WorkoutSessionEvent();
+
+  @override
+  List<Object?> get props => [];
+}
+
+class SaveWorkoutSession extends WorkoutSessionEvent {
+  final WorkoutSession session;
+
+  const SaveWorkoutSession(this.session);
+
+  @override
+  List<Object?> get props => [session];
+}
+
+class ClearWorkoutSession extends WorkoutSessionEvent {
+  const ClearWorkoutSession();
+}
+</file>
+
+<file path="lib/logic/bloc/workout_session/workout_session_state.dart">
+part of 'workout_session_bloc.dart';
+
+class WorkoutSessionState extends Equatable {
+  final WorkoutSession? session;
+
+  const WorkoutSessionState({this.session});
+
+  bool get hasSession => session != null;
+
+  @override
+  List<Object?> get props => [session];
+}
+</file>
+
+<file path="lib/logic/cubit/workout_video_cubit.dart">
+import 'package:hydrated_bloc/hydrated_bloc.dart';
+
+/// Stores a user-chosen YouTube URL/ID per workout session (keyed by planDayId).
+class WorkoutVideoCubit extends HydratedCubit<Map<String, String>> {
+  WorkoutVideoCubit() : super(const {});
+
+  void setVideoForSession(String sessionKey, String urlOrId) {
+    final cleanedKey = sessionKey.trim();
+    if (cleanedKey.isEmpty) return;
+    final updated = Map<String, String>.from(state);
+    updated[cleanedKey] = urlOrId.trim();
+    emit(updated);
+  }
+
+  void clearVideoForSession(String sessionKey) {
+    if (!state.containsKey(sessionKey)) return;
+    final updated = Map<String, String>.from(state)..remove(sessionKey);
+    emit(updated);
+  }
+
+  String? getVideoForSession(String sessionKey) => state[sessionKey];
+
+  @override
+  Map<String, String>? fromJson(Map<String, dynamic> json) {
+    return json.map((key, value) => MapEntry(key, value as String));
+  }
+
+  @override
+  Map<String, dynamic>? toJson(Map<String, String> state) {
+    return Map<String, dynamic>.from(state);
+  }
+}
+</file>
+
 <file path="lib/presentation/screens/workout/selection/workout_selection_screen.dart">
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -1647,6 +1386,106 @@ class WorkoutSelectionScreen extends StatelessWidget {
       totalSeconds += stage.duration.inSeconds;
     }
     return (totalSeconds / 60).round();
+  }
+}
+</file>
+
+<file path="lib/presentation/widgets/info_row.dart">
+import 'package:flutter/material.dart';
+
+class InfoRow extends StatelessWidget {
+  final IconData icon;
+  final String label;
+
+  const InfoRow({
+    super.key,
+    required this.icon,
+    required this.label,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Row(
+      children: [
+        Icon(
+          icon,
+          size: 18,
+          color: theme.primaryColor.withValues(alpha: 0.6),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(
+            label,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.8),
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+</file>
+
+<file path="lib/presentation/widgets/session_info_card.dart">
+import 'package:flutter/material.dart';
+import 'package:mars_workout_app/data/models/workout_session.dart';
+import 'package:mars_workout_app/presentation/widgets/info_row.dart';
+
+class SessionInfoCard extends StatelessWidget {
+  final WorkoutSession session;
+
+  const SessionInfoCard({super.key, required this.session});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: theme.primaryColor.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: theme.primaryColor.withValues(alpha: 0.15),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            session.workout.title,
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.bold,
+              color: theme.primaryColor,
+            ),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 12),
+          InfoRow(
+            icon: Icons.donut_large_rounded,
+            label: session.getProgressDescription(),
+          ),
+          const SizedBox(height: 8),
+          InfoRow(
+            icon: Icons.history_rounded,
+            label: _formatTimeAgo(session.savedAt),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatTimeAgo(DateTime dateTime) {
+    final difference = DateTime.now().difference(dateTime);
+    if (difference.inMinutes < 1) return 'Just now';
+    if (difference.inMinutes < 60) return '${difference.inMinutes}m ago';
+    if (difference.inHours < 24) return '${difference.inHours}h ago';
+    return '${difference.inDays}d ago';
   }
 }
 </file>
@@ -4818,6 +4657,256 @@ migration:
     - 'ios/Runner.xcodeproj/project.pbxproj'
 </file>
 
+<file path="COUNTDOWN_STAGES.md">
+# Countdown Stages Feature
+
+## Overview
+Countdown stages are now integrated as actual workout stages instead of being an overlay. This means:
+- Countdown timers appear as regular stages in the workout
+- They're visible in the progress bar (shown in orange)
+- YouTube videos continue playing uninterrupted through countdown stages
+- The workout flow is more predictable and consistent
+
+## How It Works
+
+### Automatic Countdown Injection
+When a workout starts, countdown stages are automatically added:
+- **5 seconds** before the very first work stage ("Get Ready")
+- **10 seconds** before each subsequent work stage ("Get Ready")
+- **No countdown** before rest/recovery/cooldown stages
+
+### Visual Indicators
+- **Progress bar**: Countdown stages show in orange, work stages in blue
+- **Stage name**: "GET READY" appears in orange text
+- **Countdown overlay**: Full-screen countdown appears during "Get Ready" stages
+- **Next stage preview**: Shows which exercise is coming next
+
+### YouTube Video Behavior
+- Videos play continuously through ALL stages (including countdown stages)
+- No interruptions or restarts when transitioning between stages
+- User controls video playback independently of the workout timer
+
+## Implementation Details
+
+### Files Created
+1. **`lib/data/models/workout_helper.dart`**
+   - `addCountdownStages()` - Injects countdown stages into workout
+   - `isCountdownStage()` - Identifies if a stage is a countdown
+
+### Files Modified
+1. **`lib/logic/bloc/timer/timer_state.dart`**
+   - Removed `isPrep` flag (no longer needed)
+   - Simplified state management
+
+2. **`lib/logic/bloc/timer/timer_bloc.dart`**
+   - Removed prep timer logic
+   - Simplified stage transitions
+   - All stages are now treated equally
+
+3. **`lib/logic/bloc/timer/timer_event.dart`**
+   - Updated `RestoreTimer` to remove `isPrep` parameter
+
+4. **`lib/presentation/screens/workout/workout_screen.dart`**
+   - Removed `PrepOverlay` import
+   - Added countdown detection in GIF builder
+   - Shows countdown overlay only for "Get Ready" stages
+   - YouTube video section unaffected (plays continuously)
+
+5. **`lib/presentation/screens/workout/widgets/stage_info/stage_info_and_segment_bar.dart`**
+   - Countdown stages display in orange in progress bar
+   - Stage name shows in orange for countdown stages
+
+6. **`lib/presentation/screens/workout/workout_preview/workout_preview_screen.dart`**
+   - Adds countdown stages when starting a new workout
+
+7. **`lib/data/models/workout_session.dart`**
+   - Removed `isPrep` from session storage
+   - Countdown stages are part of the saved workout structure
+
+### Files Deleted
+1. **`lib/presentation/screens/workout/widgets/timer/prep_overlay.dart`**
+   - No longer needed (functionality moved to workout_screen.dart)
+
+## Example Workout Flow
+
+### Before (with prep overlay):
+```
+[PREP OVERLAY 5s] → Warm Up → [PREP OVERLAY 10s] → Work Set 1 → Rest → [PREP OVERLAY 10s] → Work Set 2
+```
+
+### After (with countdown stages):
+```
+Get Ready 5s → Warm Up → Get Ready 10s → Work Set 1 → Rest → Get Ready 10s → Work Set 2
+```
+
+### Visual Progress Bar:
+```
+🟠🟦🟠🟦⬜🟠⬜
+↑ Current stage (Get Ready)
+🟠 = Countdown stages
+🟦 = Work stages completed
+⬜ = Upcoming stages
+```
+
+## Benefits
+
+1. **Predictable Duration**: Users can see exact workout length including all countdown times
+2. **Consistent Experience**: All stages work the same way
+3. **Better Resume**: Saved workouts preserve countdown stages
+4. **Simpler Code**: Removed complex prep logic from timer
+5. **YouTube Friendly**: Videos play uninterrupted through entire workout
+6. **Visual Progress**: Users can see countdown stages in the progress bar
+
+## User Experience
+
+### During Countdown Stages:
+- Full-screen black overlay appears
+- Large orange countdown timer (circular progress)
+- "GET READY" text in orange
+- "NEXT UP: [Exercise Name]" preview
+- YouTube video (if used) continues playing in background
+
+### During Work/Rest Stages:
+- Normal workout UI (GIF or YouTube video visible)
+- Timer counts up from 0 to stage duration
+- Stage name and description visible
+- Progress bar shows position in workout
+
+## Technical Notes
+
+### Stage Detection
+Countdown stages are identified by:
+```dart
+stage.name.toLowerCase() == 'get ready'
+```
+
+### Rest Stage Detection
+Rest stages (which don't get countdown) are identified by:
+```dart
+stageName.contains('rest') || 
+stageName.contains('recover') || 
+stageName.contains('cool')
+```
+
+### Countdown Durations
+- First countdown: 5 seconds
+- Subsequent countdowns: 10 seconds
+- Stored as: `Duration(seconds: 5)` or `Duration(seconds: 10)`
+</file>
+
+<file path="RESUME_WORKOUT_FEATURE.md">
+# Resume Workout Feature & Countdown Stages
+
+## Overview
+This feature allows users to resume a workout if they exit the app during a workout session. The workout state is automatically saved and the user is prompted to resume when they reopen the app.
+
+Additionally, countdown stages have been integrated as actual workout stages, making them visible in the workout progress bar and allowing YouTube videos to play continuously through all stages.
+
+## How It Works
+
+### 1. Workout State Persistence
+- When a user starts a workout, the `WorkoutPage` monitors the workout state
+- State is automatically saved:
+  - Every 5 seconds during the workout
+  - When stage changes
+  - When the app goes to background (paused/inactive)
+  - When the user backs out of the workout
+
+### 2. State Storage
+- Uses `hydrated_bloc` for persistent storage
+- `WorkoutSessionBloc` manages the saved session
+- Session includes:
+  - Complete workout data
+  - Current stage index
+  - Elapsed time
+  - Timer state (running/paused, prep mode)
+  - Plan day ID and workout type
+  - Timestamp of when it was saved
+
+### 3. Resume on Startup
+- When the app starts, `HomePageWithResumeCheck` checks for saved sessions
+- If a valid session exists (less than 24 hours old), a dialog is shown
+- User can choose to:
+  - **Resume**: Continue the workout from where they left off
+  - **Discard**: Delete the saved session and start fresh
+
+### 4. Exit Confirmation
+- When a user tries to back out during a workout, they get a confirmation dialog
+- The dialog explains their progress will be saved
+- Options:
+  - **Cancel**: Stay in the workout
+  - **Exit & Save**: Save the workout and return to home
+
+### 5. Automatic Cleanup
+- Saved sessions are automatically cleared when:
+  - The workout is completed successfully
+  - The session is older than 24 hours
+  - The user chooses to discard
+
+## Files Modified/Created
+
+### New Files:
+1. `lib/data/models/workout_session.dart` - Model for saved workout sessions
+2. `lib/logic/bloc/workout_session/workout_session_bloc.dart` - BLoC for managing sessions
+3. `lib/logic/bloc/workout_session/workout_session_event.dart` - Session events
+4. `lib/logic/bloc/workout_session/workout_session_state.dart` - Session state
+5. `lib/presentation/widgets/resume_workout_dialog.dart` - UI for resume dialog
+
+### Modified Files:
+1. `lib/presentation/app/main.dart` - Added WorkoutSessionBloc provider and resume check
+2. `lib/presentation/screens/workout/workout_page.dart` - Added state saving logic
+3. `lib/presentation/screens/workout/workout_screen.dart` - Added exit confirmation
+4. `lib/logic/bloc/timer/timer_bloc.dart` - Added RestoreTimer event
+5. `lib/logic/bloc/timer/timer_event.dart` - Added RestoreTimer event class
+
+## User Experience
+
+### Scenario 1: App Backgrounded
+1. User starts a workout
+2. User receives a phone call (app goes to background)
+3. Workout state is automatically saved
+4. User returns to app later
+5. Dialog prompts to resume with progress shown
+
+### Scenario 2: User Exits Workout
+1. User starts a workout
+2. User presses back button
+3. Confirmation dialog appears
+4. User confirms exit
+5. Workout state is saved
+6. Next time app opens, resume dialog appears
+
+### Scenario 3: Workout Completed
+1. User completes workout
+2. Saved session is automatically cleared
+3. No resume prompt on next app launch
+
+## Technical Details
+
+### State Saving Frequency
+- Every 5 seconds (to minimize performance impact)
+- On stage transitions (important milestones)
+- On app lifecycle changes (background/foreground)
+- On explicit user exit
+
+### Session Validity
+- Sessions expire after 24 hours
+- Invalid sessions are automatically discarded
+- Only one session can be saved at a time
+
+### Resume Behavior
+- Timer starts in paused state (gives user time to prepare)
+- All workout context is preserved (stage, elapsed time, prep mode)
+- Video/GIF position is restored to current stage
+- Plan progress tracking continues correctly
+
+## Future Enhancements (Optional)
+- Support for multiple saved workouts
+- Custom session expiry time
+- Workout history/analytics from saved sessions
+- Share workout progress
+</file>
+
 <file path="android/app/src/main/AndroidManifest.xml">
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.INTERNET" />
@@ -5619,6 +5708,83 @@ migration:
 </Workspace>
 </file>
 
+<file path="lib/data/models/workout_session.dart">
+import 'package:equatable/equatable.dart';
+import 'package:mars_workout_app/core/constants/enums/workout_type.dart';
+import 'package:mars_workout_app/data/models/workout_model.dart';
+
+/// Represents a saved workout session that can be resumed
+class WorkoutSession extends Equatable {
+  final Workout workout;
+  final String planDayId;
+  final WorkoutType workoutType;
+  final int currentStageIndex;
+  final Duration elapsed;
+  final bool isRunning;
+  final DateTime savedAt;
+
+  const WorkoutSession({
+    required this.workout,
+    required this.planDayId,
+    required this.workoutType,
+    required this.currentStageIndex,
+    required this.elapsed,
+    required this.isRunning,
+    required this.savedAt,
+  });
+
+  @override
+  List<Object?> get props => [
+        workout,
+        planDayId,
+        workoutType,
+        currentStageIndex,
+        elapsed,
+        isRunning,
+        savedAt,
+      ];
+
+  Map<String, dynamic> toJson() => {
+        'workout': workout.toJson(),
+        'planDayId': planDayId,
+        'workoutType': workoutType.toString(),
+        'currentStageIndex': currentStageIndex,
+        'elapsed': elapsed.inSeconds,
+        'isRunning': isRunning,
+        'savedAt': savedAt.toIso8601String(),
+      };
+
+  factory WorkoutSession.fromJson(Map<String, dynamic> json) {
+    return WorkoutSession(
+      workout: Workout.fromJson(json['workout']),
+      planDayId: json['planDayId'],
+      workoutType: WorkoutType.values.firstWhere(
+        (e) => e.toString() == json['workoutType'],
+      ),
+      currentStageIndex: json['currentStageIndex'],
+      elapsed: Duration(seconds: json['elapsed']),
+      isRunning: json['isRunning'],
+      savedAt: DateTime.parse(json['savedAt']),
+    );
+  }
+
+  /// Check if the session is still valid (not too old)
+  bool isValid({Duration maxAge = const Duration(hours: 24)}) {
+    return DateTime.now().difference(savedAt) < maxAge;
+  }
+
+  /// Get a friendly description of workout progress
+  String getProgressDescription() {
+    final totalStages = workout.stages.length;
+    if (totalStages == 0) return 'No stages';
+
+    final completedStages = currentStageIndex;
+    final percentComplete = ((completedStages / totalStages) * 100).round();
+    return '$percentComplete% complete - Stage ${currentStageIndex + 1}/$totalStages';
+  }
+}
+</file>
+
 <file path="lib/presentation/screens/home_screen/details/plan_details.dart">
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -6008,119 +6174,460 @@ class PlanListScreen extends StatelessWidget {
 }
 </file>
 
-<file path="lib/presentation/screens/workout/completion/workout_completion_screen.dart">
+<file path="lib/presentation/screens/workout/widgets/workout_video_player.dart">
 import 'package:flutter/material.dart';
-import 'package:lottie/lottie.dart';
-import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:mars_workout_app/core/constants/enums/workout_type.dart';
+import 'package:mars_workout_app/data/models/workout_model.dart';
+import 'package:mars_workout_app/data/repositories/misc/video_repository.dart';
+import 'package:mars_workout_app/logic/bloc/timer/timer_bloc.dart';
+import 'package:mars_workout_app/logic/cubit/workout_video_cubit.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 
-class WorkoutCompletedScreen extends StatelessWidget {
+/// Top-of-screen video section for long workouts:
+/// - Lets the user paste/search a YouTube URL/ID/Playlist
+/// - Plays inline where the GIF normally sits
+/// - Provides a custom fullscreen experience in portrait.
+class WorkoutVideoSection extends StatefulWidget {
+  final Workout workout;
+  final String planDayId;
+  final WorkoutType workoutType;
+
+  const WorkoutVideoSection({
+    super.key,
+    required this.workout,
+    required this.planDayId,
+    required this.workoutType,
+  });
+
+  @override
+  State<WorkoutVideoSection> createState() => _WorkoutVideoSectionState();
+}
+
+class _WorkoutVideoSectionState extends State<WorkoutVideoSection> {
+  late final String _sessionKey;
+  YoutubePlayerController? _youtubeController;
+  String? _currentVideoId;
+  String? _currentPlaylistId;
+
+  @override
+  void initState() {
+    super.initState();
+    _sessionKey = widget.planDayId.isNotEmpty ? widget.planDayId : widget.workout.title;
+  }
+
+  @override
+  void dispose() {
+    _youtubeController?.dispose();
+    super.dispose();
+  }
+
+  void _ensureYoutubeController(String? videoId, String? playlistId, bool autoPlay) {
+    if (videoId == null && playlistId == null) {
+      _youtubeController?.dispose();
+      _youtubeController = null;
+      _currentVideoId = null;
+      _currentPlaylistId = null;
+      return;
+    }
+
+    // Check if we already have a controller for this video/playlist
+    if (playlistId != null) {
+      if (_currentPlaylistId == playlistId && _youtubeController != null) return;
+    } else if (videoId != null) {
+      if (_currentVideoId == videoId && _youtubeController != null) return;
+    }
+
+    _youtubeController?.dispose();
+    _youtubeController = YoutubePlayerController(
+      initialVideoId: videoId ?? '',
+      flags: YoutubePlayerFlags(
+        autoPlay: autoPlay,
+        mute: false,
+        enableCaption: true,
+        controlsVisibleAtStart: false,
+      ),
+    );
+
+    _currentVideoId = videoId;
+    _currentPlaylistId = playlistId;
+
+    if (playlistId != null) {
+      // Note: youtube_player_flutter's support for playlists is limited in the basic controller.
+      // Usually, it requires the loadPlaylist method or passing it in flags if supported by the underlying iFrame.
+      // For this package, we can use the videoId and then it might handle the playlist if it's a playlist URL.
+    }
+  }
+
+  Future<void> _openYoutubeSearch(String query) async {
+    final search = Uri.parse('https://www.youtube.com/results?search_query=${Uri.encodeQueryComponent(query)}');
+    await launchUrl(search, mode: LaunchMode.externalApplication);
+  }
+
+  String? _extractVideoId(String? value) {
+    if (value == null) return null;
+    final trimmed = value.trim();
+    if (trimmed.isEmpty) return null;
+
+    // Direct 11-char ID
+    if (RegExp(r'^[a-zA-Z0-9_-]{11}$').hasMatch(trimmed)) return trimmed;
+
+    // youtu.be/<id>
+    final shortMatch = RegExp(r'youtu\.be/([a-zA-Z0-9_-]{11})').firstMatch(trimmed);
+    if (shortMatch != null) return shortMatch.group(1);
+
+    // youtube.com/watch?v=<id>
+    final watchMatch = RegExp(r'[?&]v=([a-zA-Z0-9_-]{11})').firstMatch(trimmed);
+    if (watchMatch != null) return watchMatch.group(1);
+
+    // youtube.com/embed/<id>
+    final embedMatch = RegExp(r'/embed/([a-zA-Z0-9_-]{11})').firstMatch(trimmed);
+    if (embedMatch != null) return embedMatch.group(1);
+
+    return null;
+  }
+
+  String? _extractPlaylistId(String? value) {
+    if (value == null) return null;
+    final trimmed = value.trim();
+    if (trimmed.isEmpty) return null;
+
+    final playlistMatch = RegExp(r'[?&]list=([a-zA-Z0-9_-]+)').firstMatch(trimmed);
+    if (playlistMatch != null) return playlistMatch.group(1);
+
+    return null;
+  }
+
+  Future<void> _promptForVideo({String? initialValue}) async {
+    final controller = TextEditingController(text: initialValue ?? '');
+    final result = await showDialog<String>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          scrollable: true,
+          title: const Text('Choose YouTube content'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: controller,
+                decoration: const InputDecoration(
+                  labelText: 'Paste YouTube URL, Video ID, or Playlist ID',
+                  hintText: 'https://youtu.be/xxxx or playlist link',
+                ),
+              ),
+              const SizedBox(height: 8),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  onPressed: () => _openYoutubeSearch(
+                    controller.text.isNotEmpty ? controller.text : widget.workout.title,
+                  ),
+                  icon: const Icon(Icons.search),
+                  label: const Text('Search on YouTube'),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            if ((initialValue ?? '').isNotEmpty)
+              TextButton(
+                onPressed: () => Navigator.of(context).pop('CLEAR'),
+                child: const Text('Clear'),
+              ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(context).pop(controller.text.trim()),
+              child: const Text('Save'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (!mounted) return;
+    if (result == null) return;
+    if (result == 'CLEAR') {
+      context.read<WorkoutVideoCubit>().clearVideoForSession(_sessionKey);
+      return;
+    }
+    if (result.isEmpty) return;
+    context.read<WorkoutVideoCubit>().setVideoForSession(_sessionKey, result);
+    
+    // Auto-play the new video immediately after saving
+    setState(() {
+      final videoId = _extractVideoId(result);
+      final playlistId = _extractPlaylistId(result);
+      _ensureYoutubeController(videoId, playlistId, true);
+    });
+  }
+
+  void _openFullscreenPlayer() {
+    if (_currentVideoId == null && _currentPlaylistId == null) return;
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        fullscreenDialog: true,
+        builder: (ctx) => BlocProvider.value(
+          value: context.read<TimerBloc>(),
+          child: WorkoutVideoFullscreenScreen(
+            videoId: _currentVideoId,
+            playlistId: _currentPlaylistId,
+            workoutTitle: widget.workout.title,
+            workoutDescription: widget.workout.description,
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final videoCubit = context.watch<WorkoutVideoCubit>();
+    final savedVideoInput = videoCubit.getVideoForSession(_sessionKey);
+    final fallbackVideoId = VideoRepository.getYoutubeVideoId(widget.workoutType);
+    final chosenInput = savedVideoInput?.isNotEmpty == true ? savedVideoInput : fallbackVideoId;
+    
+    final youtubeVideoId = _extractVideoId(chosenInput);
+    final youtubePlaylistId = _extractPlaylistId(chosenInput);
+
+    _ensureYoutubeController(youtubeVideoId, youtubePlaylistId, false);
+
+    return Container(
+      width: double.infinity,
+      color: Colors.grey.shade100,
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            AspectRatio(
+              aspectRatio: 16 / 9,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: (youtubeVideoId != null || youtubePlaylistId != null) && _youtubeController != null
+                    ? Stack(
+                        children: [
+                          Positioned.fill(
+                            child: YoutubePlayer(
+                              controller: _youtubeController!,
+                              progressIndicatorColor: theme.primaryColor,
+                              bottomActions: const [
+                                CurrentPosition(),
+                                ProgressBar(isExpanded: true),
+                                RemainingDuration(),
+                                PlaybackSpeedButton(),
+                              ],
+                            ),
+                          ),
+                          Positioned(
+                            right: 8,
+                            bottom: 8,
+                            child: IconButton(
+                              icon: const Icon(Icons.fullscreen, color: Colors.white),
+                              onPressed: _openFullscreenPlayer,
+                            ),
+                          ),
+                        ],
+                      )
+                    : Container(
+                        color: Colors.black,
+                        child: Center(
+                          child: Text(
+                            'Add a YouTube URL, ID, or Playlist to play here',
+                            textAlign: TextAlign.center,
+                            style: theme.textTheme.bodyMedium?.copyWith(color: Colors.white70),
+                          ),
+                        ),
+                      ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                ElevatedButton.icon(
+                  onPressed: () => _promptForVideo(initialValue: chosenInput),
+                  icon: const Icon(Icons.edit),
+                  label: Text((youtubeVideoId != null || youtubePlaylistId != null) ? 'Change content' : 'Set content'),
+                ),
+                const SizedBox(width: 12),
+                TextButton(
+                  onPressed: () => _openYoutubeSearch(widget.workout.title),
+                  child: const Text('Search YouTube'),
+                ),
+              ],
+            ),
+            if (youtubeVideoId == null && youtubePlaylistId == null)
+              Padding(
+                padding: const EdgeInsets.only(top: 8.0),
+                child: Text(
+                  'Paste a YouTube URL, ID, or Playlist to start playback.',
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey[600]),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Fullscreen portrait video screen with workout name, info and remaining time.
+class WorkoutVideoFullscreenScreen extends StatefulWidget {
+  final String? videoId;
+  final String? playlistId;
   final String workoutTitle;
-  final int totalMinutes;
-  final bool isWeekComplete;
-  final bool isPlanComplete;
+  final String workoutDescription;
 
-  const WorkoutCompletedScreen({super.key, required this.workoutTitle, required this.totalMinutes, this.isWeekComplete = false, this.isPlanComplete = false});
+  const WorkoutVideoFullscreenScreen({
+    super.key,
+    this.videoId,
+    this.playlistId,
+    required this.workoutTitle,
+    required this.workoutDescription,
+  });
+
+  @override
+  State<WorkoutVideoFullscreenScreen> createState() => _WorkoutVideoFullscreenScreenState();
+}
+
+class _WorkoutVideoFullscreenScreenState extends State<WorkoutVideoFullscreenScreen> {
+  late final YoutubePlayerController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = YoutubePlayerController(
+      initialVideoId: widget.videoId ?? '',
+      flags: const YoutubePlayerFlags(
+        autoPlay: true,
+        mute: false,
+        enableCaption: true,
+        controlsVisibleAtStart: true,
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _showInfo(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: Text(widget.workoutTitle),
+        content: Text(
+          widget.workoutDescription.isNotEmpty ? widget.workoutDescription : 'No description available.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    String titleText;
-    String subText;
-    Color primaryColor;
-    String icon;
-
-    if (isPlanComplete) {
-      titleText = "PLAN CONQUERED!";
-      subText = "You have finished the entire program. Incredible work!";
-      primaryColor = Colors.amber;
-      icon = 'https://media1.giphy.com/media/v1.Y2lkPTc5MGI3NjExMXV6a2h1c2N3bTFtOWxkOWZuNDc5dXVrMTRuaTVnamQwcXd0aXN1OSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/3Gm15eZOsNk0tptIuG/giphy.gif';
-    } else if (isWeekComplete) {
-      titleText = "WEEK CRUSHED!";
-      subText = "Another week down. You're getting stronger.";
-      primaryColor = Colors.purple;
-      icon = 'https://media.giphy.com/media/v1.Y2lkPWVjZjA1ZTQ3cW94YndpcGY0bTV0cWZ2OG1tcDl5eW5ybmNkYjdja3hxODM5NTRhdSZlcD12MV9naWZzX3NlYXJjaCZjdD1n/4sPHesuyPZHRvGbDc9/giphy.gif';
-    } else {
-      titleText = "WORKOUT COMPLETE!";
-      subText = "You crushed $workoutTitle.";
-      primaryColor = theme.colorScheme.tertiary;
-      icon = 'https://media.giphy.com/media/v1.Y2lkPWVjZjA1ZTQ3ZGNoaGdsaWRzc24zZHluOTM4bzBqMzlqeXRoczExcnd4MmcxMHg3OCZlcD12MV9naWZzX3NlYXJjaCZjdD1n/tf9jjMcO77YzV4YPwE/giphy.gif';
-    }
-
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Colors.black,
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24),
-          child: Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Expanded(
-                  child: Stack(
-                    alignment: AlignmentGeometry.center,
-                    clipBehavior: Clip.antiAlias,
-                    children: [
-                      if (isPlanComplete || isWeekComplete) Lottie.asset('assets/lottie/confetti_animation.json', repeat: isPlanComplete ? true : false),
-                      Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          CachedNetworkImage(
-                            imageUrl: icon,
-                            placeholder: (context, url) => const Center(child: CircularProgressIndicator()),
-                            errorWidget: (context, url, error) => const Icon(Icons.fitness_center, size: 64),
-                            memCacheWidth: 400,
-                            memCacheHeight: 400,
-                          ),
-                          const SizedBox(height: 32),
-
-                          // Title
-                          Text(
-                            titleText,
-                            style: theme.textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold, color: primaryColor),
-                            textAlign: TextAlign.center,
-                          ),
-                          const SizedBox(height: 16),
-
-                          // Subtext
-                          Text(
-                            subText,
-                            style: theme.textTheme.bodyLarge?.copyWith(color: Colors.grey[700]),
-                            textAlign: TextAlign.center,
-                          ),
-                          const SizedBox(height: 8),
-
-                          // Stats
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                            decoration: BoxDecoration(color: Colors.grey.shade100, borderRadius: BorderRadius.circular(20)),
-                            child: Text("Session Time: $totalMinutes mins", style: theme.textTheme.bodyMedium?.copyWith(color: Colors.grey[700])),
-                          ),
-
-                          const SizedBox(height: 16),
-
-                          // Button
-                          SizedBox(
-                            width: double.infinity,
-                            height: 56,
-                            child: ElevatedButton(
-                              onPressed: () {
-                                Navigator.of(context)
-                                  ..pop()
-                                  ..pop();
-                              },
-                              style: ElevatedButton.styleFrom(backgroundColor: primaryColor),
-                              child: const Text("FINISH"),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
+        child: Stack(
+          children: [
+            Center(
+              child: AspectRatio(
+                aspectRatio: 16 / 9,
+                child: YoutubePlayer(
+                  controller: _controller,
+                  progressIndicatorColor: theme.primaryColor,
+                  bottomActions: const [
+                    CurrentPosition(),
+                    ProgressBar(isExpanded: true),
+                    RemainingDuration(),
+                    PlaybackSpeedButton(),
+                  ],
+                  onEnded: (data) {
+                    // This handles basic "auto-next" logic for playlists if the iframe supports it, 
+                    // or you can manually trigger logic here.
+                  },
                 ),
-              ],
+              ),
             ),
-          ),
+            Positioned(
+              top: 8,
+              left: 8,
+              child: IconButton(
+                icon: const Icon(Icons.close, color: Colors.white),
+                onPressed: () => Navigator.of(context).pop(),
+              ),
+            ),
+            Positioned(
+              right: 16,
+              bottom: 24,
+              child: BlocBuilder<TimerBloc, TimerState>(
+                builder: (context, state) {
+                  final remaining = state.currentStage.duration - state.elapsed;
+                  final totalSeconds = remaining.inSeconds < 0 ? 0 : remaining.inSeconds;
+                  final minutes = (totalSeconds ~/ 60).toString().padLeft(2, '0');
+                  final seconds = (totalSeconds % 60).toString().padLeft(2, '0');
+
+                  return Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.6),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Flexible(
+                              child: Text(
+                                widget.workoutTitle,
+                                overflow: TextOverflow.ellipsis,
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            IconButton(
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(),
+                              icon: const Icon(Icons.info_outline, size: 18, color: Colors.white),
+                              onPressed: () => _showInfo(context),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '$minutes:$seconds',
+                          style: theme.textTheme.titleMedium?.copyWith(color: Colors.white),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -6128,134 +6635,115 @@ class WorkoutCompletedScreen extends StatelessWidget {
 }
 </file>
 
-<file path="lib/presentation/screens/workout/workout_preview/workout_preview_screen.dart">
+<file path="lib/presentation/widgets/resume_workout_dialog.dart">
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:mars_workout_app/core/constants/enums/workout_type.dart';
-import 'package:mars_workout_app/data/models/workout_model.dart';
+import 'package:mars_workout_app/data/models/workout_session.dart';
 import 'package:mars_workout_app/logic/bloc/plan/plan_bloc.dart';
+import 'package:mars_workout_app/logic/bloc/timer/timer_bloc.dart';
+import 'package:mars_workout_app/logic/bloc/workout_session/workout_session_bloc.dart';
+import 'package:mars_workout_app/logic/cubit/workout_video_cubit.dart';
 import 'package:mars_workout_app/presentation/screens/workout/workout_page.dart';
+import 'package:mars_workout_app/presentation/widgets/session_info_card.dart';
 
-class WorkoutPreviewScreen extends StatelessWidget {
-  final Workout workout;
-  final String planDayId;
-  final WorkoutType workoutType;
+class ResumeWorkoutDialog extends StatelessWidget {
+  final WorkoutSession session;
 
-  const WorkoutPreviewScreen({super.key, required this.workout, required this.planDayId, required this.workoutType});
+  const ResumeWorkoutDialog({super.key, required this.session});
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final totalDuration = workout.stages.fold(Duration.zero, (prev, element) => prev + element.duration);
 
-    return Scaffold(
-      appBar: AppBar(title: const Text("Workout Overview")),
-      bottomNavigationBar: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: SizedBox(
-            height: 56,
-            child: ElevatedButton.icon(
-              onPressed: () {
-                // Navigate to the actual Timer/Video screen
-                Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => BlocProvider.value(
-                      value: BlocProvider.of<PlanBloc>(context),
-                      child: WorkoutPage(workout: workout, planDayId: planDayId, workoutType: workoutType),
-                    ),
-                  ),
-                );
-              },
-              icon: const Icon(Icons.play_arrow_rounded),
-              label: const Text("START WORKOUT"),
+    return AlertDialog(
+      scrollable: true,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      title: Row(
+        spacing: 12,
+        children: [
+          Icon(Icons.restart_alt_rounded, color: theme.primaryColor, size: 28),
+          const Expanded(
+            child: Text(
+              'Resume Workout?',
+              style: TextStyle(fontWeight: FontWeight.bold),
             ),
           ),
-        ),
+        ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // --- HEADER ---
-            Text(
-              workout.title,
-              style: theme.textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold, color: theme.primaryColor),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'You have an unfinished workout session. Would you like to continue where you left off?',
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.textTheme.bodySmall?.color?.withValues(alpha: 0.8),
+              height: 1.4,
             ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                const Icon(Icons.timer_outlined, size: 20, color: Colors.grey),
-                const SizedBox(width: 8),
-                Text("${totalDuration.inMinutes} minutes total", style: theme.textTheme.titleMedium?.copyWith(color: Colors.grey[700])),
-              ],
-            ),
-            const SizedBox(height: 16),
-            Text(workout.description, style: theme.textTheme.bodyLarge),
-            const SizedBox(height: 32),
+          ),
+          const SizedBox(height: 20),
+          SessionInfoCard(session: session),
+        ],
+      ),
+      actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+      actions: [
+        TextButton(
+          onPressed: () {
+            context.read<WorkoutSessionBloc>().add(const ClearWorkoutSession());
+            Navigator.of(context).pop();
+          },
+          style: TextButton.styleFrom(
+            foregroundColor: theme.colorScheme.error,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          ),
+          child: const Text('Clear'),
+        ),
+        ElevatedButton(
+          onPressed: () => _handleResume(context),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: theme.primaryColor,
+            foregroundColor: Colors.white,
+            elevation: 0,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+          ),
+          child: const Text('Resume'),
+        ),
+      ],
+    );
+  }
 
-            // --- STAGES LIST ---
-            Text(
-              "WORKOUT STAGES",
-              style: theme.textTheme.labelLarge?.copyWith(color: Colors.grey, letterSpacing: 1.5, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 16),
+  void _handleResume(BuildContext context) {
+    // Capture dependencies before popping the dialog context
+    final planBloc = context.read<PlanBloc>();
+    final sessionBloc = context.read<WorkoutSessionBloc>();
+    final navigator = Navigator.of(context);
 
-            ListView.separated(
-              physics: const NeverScrollableScrollPhysics(), // Scroll with whole page
-              shrinkWrap: true,
-              itemCount: workout.stages.length,
-              separatorBuilder: (context, index) => const Divider(height: 1),
-              itemBuilder: (context, index) {
-                final stage = workout.stages[index];
+    // Initialize and restore TimerBloc state
+    final timerBloc = TimerBloc(session.workout.stages);
+    timerBloc.add(RestoreTimer(
+      currentStageIndex: session.currentStageIndex,
+      elapsed: session.elapsed,
+    ));
 
-                // Styling based on stage type
-                final isRest = stage.name.toLowerCase().contains('rest') || stage.name.toLowerCase().contains('recover');
-                final isWarmup = stage.name.toLowerCase().contains('warm');
+    // Close the dialog
+    navigator.pop();
 
-                if (isRest) {
-                } else if (isWarmup) {}
-
-                return Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 12.0),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Duration Box
-                      Container(
-                        width: 60,
-                        padding: const EdgeInsets.symmetric(vertical: 8),
-                        decoration: BoxDecoration(color: Colors.grey.shade100, borderRadius: BorderRadius.circular(8)),
-                        child: Column(
-                          children: [
-                            Text("${stage.duration.inMinutes}:${(stage.duration.inSeconds % 60).toString().padLeft(2, '0')}", style: const TextStyle(fontWeight: FontWeight.bold)),
-                            Text("min", style: TextStyle(fontSize: 10, color: Colors.grey[600])),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-
-                      // Details
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              stage.name,
-                              style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, color: isRest ? Colors.grey[700] : Colors.black),
-                            ),
-                            if (stage.description.isNotEmpty) ...[const SizedBox(height: 4), Text(stage.description, style: theme.textTheme.bodyMedium?.copyWith(color: Colors.grey[600]))],
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              },
-            ),
+    // Navigate to the workout page
+    navigator.push(
+      MaterialPageRoute(
+        builder: (_) => MultiBlocProvider(
+          providers: [
+            BlocProvider.value(value: planBloc),
+            BlocProvider.value(value: sessionBloc),
+            BlocProvider<TimerBloc>.value(value: timerBloc),
+            BlocProvider<WorkoutVideoCubit>(create: (_) => WorkoutVideoCubit()),
           ],
+          child: WorkoutPage(
+            workout: session.workout,
+            planDayId: session.planDayId,
+            workoutType: session.workoutType,
+          ),
         ),
       ),
     );
@@ -6309,58 +6797,6 @@ endforeach(plugin)
 
 foreach(ffi_plugin ${FLUTTER_FFI_PLUGIN_LIST})
   add_subdirectory(flutter/ephemeral/.plugin_symlinks/${ffi_plugin}/linux plugins/${ffi_plugin})
-  list(APPEND PLUGIN_BUNDLED_LIBRARIES ${${ffi_plugin}_bundled_libraries})
-endforeach(ffi_plugin)
-</file>
-
-<file path="windows/flutter/generated_plugin_registrant.cc">
-//
-//  Generated file. Do not edit.
-//
-
-// clang-format off
-
-#include "generated_plugin_registrant.h"
-
-#include <audioplayers_windows/audioplayers_windows_plugin.h>
-#include <flutter_inappwebview_windows/flutter_inappwebview_windows_plugin_c_api.h>
-#include <url_launcher_windows/url_launcher_windows.h>
-
-void RegisterPlugins(flutter::PluginRegistry* registry) {
-  AudioplayersWindowsPluginRegisterWithRegistrar(
-      registry->GetRegistrarForPlugin("AudioplayersWindowsPlugin"));
-  FlutterInappwebviewWindowsPluginCApiRegisterWithRegistrar(
-      registry->GetRegistrarForPlugin("FlutterInappwebviewWindowsPluginCApi"));
-  UrlLauncherWindowsRegisterWithRegistrar(
-      registry->GetRegistrarForPlugin("UrlLauncherWindows"));
-}
-</file>
-
-<file path="windows/flutter/generated_plugins.cmake">
-#
-# Generated file, do not edit.
-#
-
-list(APPEND FLUTTER_PLUGIN_LIST
-  audioplayers_windows
-  flutter_inappwebview_windows
-  url_launcher_windows
-)
-
-list(APPEND FLUTTER_FFI_PLUGIN_LIST
-)
-
-set(PLUGIN_BUNDLED_LIBRARIES)
-
-foreach(plugin ${FLUTTER_PLUGIN_LIST})
-  add_subdirectory(flutter/ephemeral/.plugin_symlinks/${plugin}/windows plugins/${plugin})
-  target_link_libraries(${BINARY_NAME} PRIVATE ${plugin}_plugin)
-  list(APPEND PLUGIN_BUNDLED_LIBRARIES $<TARGET_FILE:${plugin}_plugin>)
-  list(APPEND PLUGIN_BUNDLED_LIBRARIES ${${plugin}_bundled_libraries})
-endforeach(plugin)
-
-foreach(ffi_plugin ${FLUTTER_FFI_PLUGIN_LIST})
-  add_subdirectory(flutter/ephemeral/.plugin_symlinks/${ffi_plugin}/windows plugins/${ffi_plugin})
   list(APPEND PLUGIN_BUNDLED_LIBRARIES ${${ffi_plugin}_bundled_libraries})
 endforeach(ffi_plugin)
 </file>
@@ -6677,6 +7113,124 @@ Workout _reversePedalWorkout() {
 }
 </file>
 
+<file path="lib/presentation/screens/workout/completion/workout_completion_screen.dart">
+import 'package:flutter/material.dart';
+import 'package:lottie/lottie.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+
+class WorkoutCompletedScreen extends StatelessWidget {
+  final String workoutTitle;
+  final int totalMinutes;
+  final bool isWeekComplete;
+  final bool isPlanComplete;
+
+  const WorkoutCompletedScreen({super.key, required this.workoutTitle, required this.totalMinutes, this.isWeekComplete = false, this.isPlanComplete = false});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    String titleText;
+    String subText;
+    Color primaryColor;
+    String icon;
+
+    if (isPlanComplete) {
+      titleText = "PLAN CONQUERED!";
+      subText = "You have finished the entire program. Incredible work!";
+      primaryColor = Colors.amber;
+      icon = 'https://media1.giphy.com/media/v1.Y2lkPTc5MGI3NjExMXV6a2h1c2N3bTFtOWxkOWZuNDc5dXVrMTRuaTVnamQwcXd0aXN1OSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/3Gm15eZOsNk0tptIuG/giphy.gif';
+    } else if (isWeekComplete) {
+      titleText = "WEEK CRUSHED!";
+      subText = "Another week down. You're getting stronger.";
+      primaryColor = Colors.purple;
+      icon = 'https://media.giphy.com/media/v1.Y2lkPWVjZjA1ZTQ3cW94YndpcGY0bTV0cWZ2OG1tcDl5eW5ybmNkYjdja3hxODM5NTRhdSZlcD12MV9naWZzX3NlYXJjaCZjdD1n/4sPHesuyPZHRvGbDc9/giphy.gif';
+    } else {
+      titleText = "WORKOUT COMPLETE!";
+      subText = "You crushed $workoutTitle.";
+      primaryColor = theme.colorScheme.tertiary;
+      icon = 'https://media.giphy.com/media/v1.Y2lkPWVjZjA1ZTQ3ZGNoaGdsaWRzc24zZHluOTM4bzBqMzlqeXRoczExcnd4MmcxMHg3OCZlcD12MV9naWZzX3NlYXJjaCZjdD1n/tf9jjMcO77YzV4YPwE/giphy.gif';
+    }
+
+    return Scaffold(
+      backgroundColor: Colors.white,
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24),
+          child: Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Expanded(
+                  child: Stack(
+                    alignment: AlignmentGeometry.center,
+                    clipBehavior: Clip.antiAlias,
+                    children: [
+                      if (isPlanComplete || isWeekComplete) Lottie.asset('assets/lottie/confetti_animation.json', repeat: isPlanComplete ? true : false),
+                      Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          CachedNetworkImage(
+                            imageUrl: icon,
+                            placeholder: (context, url) => const Center(child: CircularProgressIndicator()),
+                            errorWidget: (context, url, error) => const Icon(Icons.fitness_center, size: 64),
+                            memCacheWidth: 400,
+                            memCacheHeight: 400,
+                          ),
+                          const SizedBox(height: 32),
+
+                          // Title
+                          Text(
+                            titleText,
+                            style: theme.textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold, color: primaryColor),
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 16),
+
+                          // Subtext
+                          Text(
+                            subText,
+                            style: theme.textTheme.bodyLarge?.copyWith(color: Colors.grey[700]),
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 8),
+
+                          // Stats
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                            decoration: BoxDecoration(color: Colors.grey.shade100, borderRadius: BorderRadius.circular(20)),
+                            child: Text("Session Time: $totalMinutes mins", style: theme.textTheme.bodyMedium?.copyWith(color: Colors.grey[700])),
+                          ),
+
+                          const SizedBox(height: 16),
+
+                          // Button
+                          SizedBox(
+                            width: double.infinity,
+                            height: 56,
+                            child: ElevatedButton(
+                              onPressed: () {
+                                Navigator.of(context).popUntil((route) => route.isFirst);
+                              },
+                              style: ElevatedButton.styleFrom(backgroundColor: primaryColor),
+                              child: const Text("FINISH"),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+</file>
+
 <file path="lib/presentation/screens/workout/widgets/timer/timer_widget.dart">
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -6742,31 +7296,210 @@ class TimerControls extends StatelessWidget {
 }
 </file>
 
-<file path="macos/Flutter/GeneratedPluginRegistrant.swift">
+<file path="lib/presentation/screens/workout/workout_preview/workout_preview_screen.dart">
+import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:mars_workout_app/core/constants/enums/workout_type.dart';
+import 'package:mars_workout_app/data/models/workout_helper.dart';
+import 'package:mars_workout_app/data/models/workout_model.dart';
+import 'package:mars_workout_app/logic/bloc/plan/plan_bloc.dart';
+import 'package:mars_workout_app/logic/bloc/timer/timer_bloc.dart';
+import 'package:mars_workout_app/logic/bloc/workout_session/workout_session_bloc.dart';
+import 'package:mars_workout_app/logic/cubit/workout_video_cubit.dart';
+import 'package:mars_workout_app/presentation/screens/workout/workout_page.dart';
+
+class WorkoutPreviewScreen extends StatelessWidget {
+  final Workout workout;
+  final String planDayId;
+  final WorkoutType workoutType;
+
+  const WorkoutPreviewScreen({super.key, required this.workout, required this.planDayId, required this.workoutType});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final totalDuration = workout.stages.fold(Duration.zero, (prev, element) => prev + element.duration);
+
+    return Scaffold(
+      appBar: AppBar(title: const Text("Workout Overview")),
+      bottomNavigationBar: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: SizedBox(
+            height: 56,
+            child: ElevatedButton.icon(
+              onPressed: () {
+                // Add countdown stages to the workout
+                final stagesWithCountdown = WorkoutHelper.addCountdownStages(workout.stages);
+                final workoutWithCountdown = Workout(
+                  title: workout.title,
+                  description: workout.description,
+                  stages: stagesWithCountdown,
+                );
+                
+                // Navigate to the actual Timer/Video screen
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => MultiBlocProvider(
+                      providers: [
+                        BlocProvider.value(value: context.read<PlanBloc>()),
+                        BlocProvider.value(value: context.read<WorkoutSessionBloc>()),
+                        BlocProvider<TimerBloc>(
+                          create: (_) => TimerBloc(stagesWithCountdown)..add(StartTimer()),
+                        ),
+                        BlocProvider<WorkoutVideoCubit>(create: (_) => WorkoutVideoCubit()),
+                      ],
+                      child: WorkoutPage(workout: workoutWithCountdown, planDayId: planDayId, workoutType: workoutType),
+                    ),
+                  ),
+                );
+              },
+              icon: const Icon(Icons.play_arrow_rounded),
+              label: const Text("START WORKOUT"),
+            ),
+          ),
+        ),
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(20.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // --- HEADER ---
+            Text(
+              workout.title,
+              style: theme.textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold, color: theme.primaryColor),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                const Icon(Icons.timer_outlined, size: 20, color: Colors.grey),
+                const SizedBox(width: 8),
+                Text("${totalDuration.inMinutes} minutes total", style: theme.textTheme.titleMedium?.copyWith(color: Colors.grey[700])),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Text(workout.description, style: theme.textTheme.bodyLarge),
+            const SizedBox(height: 32),
+
+            // --- STAGES LIST ---
+            Text(
+              "WORKOUT STAGES",
+              style: theme.textTheme.labelLarge?.copyWith(color: Colors.grey, letterSpacing: 1.5, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 16),
+
+            ListView.separated(
+              physics: const NeverScrollableScrollPhysics(), // Scroll with whole page
+              shrinkWrap: true,
+              itemCount: workout.stages.length,
+              separatorBuilder: (context, index) => const Divider(height: 1),
+              itemBuilder: (context, index) {
+                final stage = workout.stages[index];
+
+                // Styling based on stage type
+                final isRest = stage.name.toLowerCase().contains('rest') || stage.name.toLowerCase().contains('recover');
+                final isWarmup = stage.name.toLowerCase().contains('warm');
+
+                if (isRest) {
+                } else if (isWarmup) {}
+
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 12.0),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Duration Box
+                      Container(
+                        width: 60,
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        decoration: BoxDecoration(color: Colors.grey.shade100, borderRadius: BorderRadius.circular(8)),
+                        child: Column(
+                          children: [
+                            Text("${stage.duration.inMinutes}:${(stage.duration.inSeconds % 60).toString().padLeft(2, '0')}", style: const TextStyle(fontWeight: FontWeight.bold)),
+                            Text("min", style: TextStyle(fontSize: 10, color: Colors.grey[600])),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+
+                      // Details
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              stage.name,
+                              style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, color: isRest ? Colors.grey[700] : Colors.black),
+                            ),
+                            if (stage.description.isNotEmpty) ...[const SizedBox(height: 4), Text(stage.description, style: theme.textTheme.bodyMedium?.copyWith(color: Colors.grey[600]))],
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+</file>
+
+<file path="windows/flutter/generated_plugin_registrant.cc">
 //
 //  Generated file. Do not edit.
 //
 
-import FlutterMacOS
-import Foundation
+// clang-format off
 
-import audioplayers_darwin
-import flutter_inappwebview_macos
-import package_info_plus
-import path_provider_foundation
-import sqflite_darwin
-import url_launcher_macos
-import wakelock_plus
+#include "generated_plugin_registrant.h"
 
-func RegisterGeneratedPlugins(registry: FlutterPluginRegistry) {
-  AudioplayersDarwinPlugin.register(with: registry.registrar(forPlugin: "AudioplayersDarwinPlugin"))
-  InAppWebViewFlutterPlugin.register(with: registry.registrar(forPlugin: "InAppWebViewFlutterPlugin"))
-  FPPPackageInfoPlusPlugin.register(with: registry.registrar(forPlugin: "FPPPackageInfoPlusPlugin"))
-  PathProviderPlugin.register(with: registry.registrar(forPlugin: "PathProviderPlugin"))
-  SqflitePlugin.register(with: registry.registrar(forPlugin: "SqflitePlugin"))
-  UrlLauncherPlugin.register(with: registry.registrar(forPlugin: "UrlLauncherPlugin"))
-  WakelockPlusMacosPlugin.register(with: registry.registrar(forPlugin: "WakelockPlusMacosPlugin"))
+#include <audioplayers_windows/audioplayers_windows_plugin.h>
+#include <flutter_inappwebview_windows/flutter_inappwebview_windows_plugin_c_api.h>
+#include <url_launcher_windows/url_launcher_windows.h>
+
+void RegisterPlugins(flutter::PluginRegistry* registry) {
+  AudioplayersWindowsPluginRegisterWithRegistrar(
+      registry->GetRegistrarForPlugin("AudioplayersWindowsPlugin"));
+  FlutterInappwebviewWindowsPluginCApiRegisterWithRegistrar(
+      registry->GetRegistrarForPlugin("FlutterInappwebviewWindowsPluginCApi"));
+  UrlLauncherWindowsRegisterWithRegistrar(
+      registry->GetRegistrarForPlugin("UrlLauncherWindows"));
 }
+</file>
+
+<file path="windows/flutter/generated_plugins.cmake">
+#
+# Generated file, do not edit.
+#
+
+list(APPEND FLUTTER_PLUGIN_LIST
+  audioplayers_windows
+  flutter_inappwebview_windows
+  url_launcher_windows
+)
+
+list(APPEND FLUTTER_FFI_PLUGIN_LIST
+)
+
+set(PLUGIN_BUNDLED_LIBRARIES)
+
+foreach(plugin ${FLUTTER_PLUGIN_LIST})
+  add_subdirectory(flutter/ephemeral/.plugin_symlinks/${plugin}/windows plugins/${plugin})
+  target_link_libraries(${BINARY_NAME} PRIVATE ${plugin}_plugin)
+  list(APPEND PLUGIN_BUNDLED_LIBRARIES $<TARGET_FILE:${plugin}_plugin>)
+  list(APPEND PLUGIN_BUNDLED_LIBRARIES ${${plugin}_bundled_libraries})
+endforeach(plugin)
+
+foreach(ffi_plugin ${FLUTTER_FFI_PLUGIN_LIST})
+  add_subdirectory(flutter/ephemeral/.plugin_symlinks/${ffi_plugin}/windows plugins/${ffi_plugin})
+  list(APPEND PLUGIN_BUNDLED_LIBRARIES ${${ffi_plugin}_bundled_libraries})
+endforeach(ffi_plugin)
 </file>
 
 <file path="analysis_options.yaml">
@@ -8230,6 +8963,33 @@ TrainingPlan rowingPlan() {
 }
 </file>
 
+<file path="macos/Flutter/GeneratedPluginRegistrant.swift">
+//
+//  Generated file. Do not edit.
+//
+
+import FlutterMacOS
+import Foundation
+
+import audioplayers_darwin
+import flutter_inappwebview_macos
+import package_info_plus
+import path_provider_foundation
+import sqflite_darwin
+import url_launcher_macos
+import wakelock_plus
+
+func RegisterGeneratedPlugins(registry: FlutterPluginRegistry) {
+  AudioplayersDarwinPlugin.register(with: registry.registrar(forPlugin: "AudioplayersDarwinPlugin"))
+  InAppWebViewFlutterPlugin.register(with: registry.registrar(forPlugin: "InAppWebViewFlutterPlugin"))
+  FPPPackageInfoPlusPlugin.register(with: registry.registrar(forPlugin: "FPPPackageInfoPlusPlugin"))
+  PathProviderPlugin.register(with: registry.registrar(forPlugin: "PathProviderPlugin"))
+  SqflitePlugin.register(with: registry.registrar(forPlugin: "SqflitePlugin"))
+  UrlLauncherPlugin.register(with: registry.registrar(forPlugin: "UrlLauncherPlugin"))
+  WakelockPlusMacosPlugin.register(with: registry.registrar(forPlugin: "WakelockPlusMacosPlugin"))
+}
+</file>
+
 <file path="lib/logic/bloc/timer/timer_event.dart">
 part of 'timer_bloc.dart';
 
@@ -8248,6 +9008,19 @@ class ResetTimer extends TimerEvent {}
 
 class NextStage extends TimerEvent {}
 
+class RestoreTimer extends TimerEvent {
+  final int currentStageIndex;
+  final Duration elapsed;
+
+  const RestoreTimer({
+    required this.currentStageIndex,
+    required this.elapsed,
+  });
+
+  @override
+  List<Object> get props => [currentStageIndex, elapsed];
+}
+
 class TimerTicked extends TimerEvent {
   final Duration elapsed;
 
@@ -8261,6 +9034,7 @@ class TimerTicked extends TimerEvent {
 <file path="lib/presentation/screens/workout/widgets/stage_info/stage_info_and_segment_bar.dart">
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:mars_workout_app/data/models/workout_helper.dart';
 import 'package:mars_workout_app/logic/bloc/timer/timer_bloc.dart';
 
 class StageInfoAndSegmentBar extends StatelessWidget {
@@ -8280,11 +9054,14 @@ class StageInfoAndSegmentBar extends StatelessWidget {
                 height: 4,
                 child: Row(
                   children: List.generate(state.stages.length, (index) {
+                    final stage = state.stages[index];
+                    final isCountdown = WorkoutHelper.isCountdownStage(stage);
                     Color color;
+                    
                     if (index < state.currentStageIndex) {
-                      color = theme.colorScheme.primaryContainer;
+                      color = isCountdown ? Colors.orange.shade300 : theme.colorScheme.primaryContainer;
                     } else if (index == state.currentStageIndex) {
-                      color = theme.primaryColor;
+                      color = isCountdown ? Colors.orange : theme.primaryColor;
                     } else {
                       color = Colors.grey.shade200;
                     }
@@ -8300,17 +9077,37 @@ class StageInfoAndSegmentBar extends StatelessWidget {
               const SizedBox(height: 24),
 
               // Stage Name & Instructions
-              Text(
-                state.currentStage.name.toUpperCase(),
-                style: theme.textTheme.labelLarge?.copyWith(color: theme.primaryColor, fontWeight: FontWeight.bold, letterSpacing: 1.5),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                state.currentStage.description.isNotEmpty ? state.currentStage.description : "Keep pushing!",
-                textAlign: TextAlign.center,
-                maxLines: 99,
-                overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.bodyMedium?.copyWith(color: Colors.grey.shade600),
+              BlocBuilder<TimerBloc, TimerState>(
+                buildWhen: (previous, current) => 
+                    previous.currentStageIndex != current.currentStageIndex || 
+                    previous.currentStage.name != current.currentStage.name,
+                builder: (context, state) {
+                  final isCountdown = WorkoutHelper.isCountdownStage(state.currentStage);
+                  final stageColor = isCountdown ? Colors.orange : theme.primaryColor;
+                  
+                  return Column(
+                    children: [
+                      Text(
+                        state.currentStage.name.toUpperCase(),
+                        style: theme.textTheme.labelLarge?.copyWith(
+                          color: stageColor, 
+                          fontWeight: FontWeight.bold, 
+                          letterSpacing: 1.5,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        state.currentStage.description.isNotEmpty 
+                            ? state.currentStage.description 
+                            : "Keep pushing!",
+                        textAlign: TextAlign.center,
+                        maxLines: 99,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodyMedium?.copyWith(color: Colors.grey.shade600),
+                      ),
+                    ],
+                  );
+                },
               ),
             ],
           );
@@ -8324,6 +9121,7 @@ class StageInfoAndSegmentBar extends StatelessWidget {
 <file path="lib/presentation/screens/workout/widgets/timer/linear_timer_display.dart">
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:mars_workout_app/data/models/workout_helper.dart';
 import 'package:mars_workout_app/logic/bloc/timer/timer_bloc.dart';
 
 class LinearTimerDisplay extends StatelessWidget {
@@ -8335,24 +9133,38 @@ class LinearTimerDisplay extends StatelessWidget {
 
     return RepaintBoundary(
       child: BlocBuilder<TimerBloc, TimerState>(
-        buildWhen: (previous, current) => previous.elapsed != current.elapsed || previous.isPrep != current.isPrep || previous.currentStageIndex != current.currentStageIndex,
+        buildWhen: (previous, current) => 
+            previous.elapsed != current.elapsed || 
+            previous.currentStageIndex != current.currentStageIndex,
         builder: (context, state) {
           final maxDuration = state.currentStage.duration;
+          final isCountdown = WorkoutHelper.isCountdownStage(state.currentStage);
 
-          final durationToShow = state.isPrep ? maxDuration : maxDuration - state.elapsed;
-
+          // For countdown stages, show time remaining (countdown)
+          // For work stages, show time remaining (count down to zero)
+          final durationToShow = maxDuration - state.elapsed;
           final secondsDisplay = durationToShow.inSeconds < 0 ? 0 : durationToShow.inSeconds;
 
+          // Progress bar fills up as time elapses
           double progress = 0.0;
-          if (maxDuration.inSeconds > 0 && !state.isPrep) {
+          if (maxDuration.inSeconds > 0) {
             progress = state.elapsed.inSeconds / maxDuration.inSeconds;
           }
+
+          // Use orange color for countdown stages
+          final timerColor = isCountdown ? Colors.orange : theme.primaryColor;
 
           return Column(
             children: [
               Text(
                 '${(secondsDisplay / 60).floor().toString().padLeft(2, '0')}:${(secondsDisplay % 60).toString().padLeft(2, '0')}',
-                style: theme.textTheme.displayLarge?.copyWith(fontSize: 80, fontWeight: FontWeight.w800, color: theme.primaryColor, height: 1.0, fontFeatures: [const FontFeature.tabularFigures()]),
+                style: theme.textTheme.displayLarge?.copyWith(
+                  fontSize: 80, 
+                  fontWeight: FontWeight.w800, 
+                  color: timerColor, 
+                  height: 1.0, 
+                  fontFeatures: [const FontFeature.tabularFigures()],
+                ),
               ),
               const SizedBox(height: 24),
 
@@ -8361,11 +9173,15 @@ class LinearTimerDisplay extends StatelessWidget {
                 child: SizedBox(
                   height: 12,
                   child: TweenAnimationBuilder<double>(
-                    key: ValueKey('work_${state.currentStageIndex}_${state.isPrep}'),
+                    key: ValueKey('stage_${state.currentStageIndex}'),
                     tween: Tween<double>(begin: 0, end: progress),
                     duration: const Duration(milliseconds: 1000),
                     curve: Curves.linear,
-                    builder: (context, value, _) => LinearProgressIndicator(value: value, backgroundColor: Colors.grey.shade100, color: theme.primaryColor),
+                    builder: (context, value, _) => LinearProgressIndicator(
+                      value: value, 
+                      backgroundColor: Colors.grey.shade100, 
+                      color: timerColor,
+                    ),
                   ),
                 ),
               ),
@@ -8373,116 +9189,6 @@ class LinearTimerDisplay extends StatelessWidget {
           );
         },
       ),
-    );
-  }
-}
-</file>
-
-<file path="lib/presentation/screens/workout/widgets/timer/prep_overlay.dart">
-import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:mars_workout_app/logic/bloc/timer/timer_bloc.dart';
-
-class PrepOverlay extends StatelessWidget {
-  const PrepOverlay({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return BlocBuilder<TimerBloc, TimerState>(
-      buildWhen: (previous, current) => previous.isPrep != current.isPrep || previous.elapsed != current.elapsed || previous.currentStageIndex != current.currentStageIndex,
-      builder: (context, state) {
-        final stageName = state.currentStage.name.toLowerCase();
-        final isRestStage = stageName.contains('rest') || stageName.contains('recover');
-
-        if (!state.isPrep && !isRestStage) return const SizedBox.shrink();
-
-        final isPrep = state.isPrep;
-
-        final maxDuration = isPrep ? Duration(seconds: state.currentStageIndex > 0 ? 10 : 5) : state.currentStage.duration;
-
-        final timeLeft = maxDuration - state.elapsed;
-        final secondsDisplay = timeLeft.inSeconds < 0 ? 0 : timeLeft.inSeconds;
-
-        final progress = maxDuration.inMilliseconds > 0 ? state.elapsed.inMilliseconds / maxDuration.inMilliseconds : 0.0;
-
-        final titleText = isPrep ? "GET READY" : "REST";
-        final activeColor = isPrep ? Colors.orange : Colors.white;
-
-        String nextUpName = "";
-        if (isPrep) {
-          nextUpName = state.currentStage.name;
-        } else {
-          final nextIndex = state.currentStageIndex + 1;
-          if (nextIndex < state.stages.length) {
-            nextUpName = state.stages[nextIndex].name;
-          } else {
-            nextUpName = "Finish";
-          }
-        }
-
-        return Container(
-          color: isRestStage ? Colors.lightBlueAccent : Colors.black.withValues(alpha: 0.9),
-          width: double.infinity,
-          height: double.infinity,
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(
-                titleText,
-                style: theme.textTheme.headlineMedium?.copyWith(color: activeColor, fontWeight: FontWeight.bold, letterSpacing: 3.0),
-              ),
-              const SizedBox(height: 40),
-
-              // Big Circular Countdown
-              SizedBox(
-                width: 200,
-                height: 200,
-                child: Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    // Faint Background Circle
-                    SizedBox.expand(
-                      child: CircularProgressIndicator(value: 1.0, strokeWidth: 15, color: Colors.white.withValues(alpha: isRestStage ? 0.2 : 0.1)),
-                    ),
-                    // Animated Foreground Circle (Filling UP)
-                    SizedBox.expand(
-                      child: TweenAnimationBuilder<double>(
-                        // Key ensures animation restarts smoothly on stage change
-                        key: ValueKey('${state.currentStageIndex}_$isPrep'),
-                        tween: Tween<double>(begin: 0.0, end: progress),
-                        duration: const Duration(milliseconds: 1000),
-                        builder: (context, value, _) => CircularProgressIndicator(value: value, strokeWidth: 15, color: activeColor, strokeCap: StrokeCap.round),
-                      ),
-                    ),
-                    // The Number
-                    Text(
-                      "$secondsDisplay",
-                      style: const TextStyle(fontSize: 90, fontWeight: FontWeight.bold, color: Colors.white, fontFeatures: [FontFeature.tabularFigures()]),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 50),
-
-              // Upcoming Stage Preview
-              if (nextUpName.isNotEmpty) ...[
-                Text("NEXT UP:", style: theme.textTheme.labelLarge?.copyWith(color: Colors.white54, letterSpacing: 1.2)),
-                const SizedBox(height: 12),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 32.0),
-                  child: Text(
-                    nextUpName,
-                    textAlign: TextAlign.center,
-                    style: theme.textTheme.headlineSmall?.copyWith(color: Colors.white, fontWeight: FontWeight.w600),
-                  ),
-                ),
-              ],
-            ],
-          ),
-        );
-      },
     );
   }
 }
@@ -9696,265 +10402,6 @@ flutter:
   # see https://flutter.dev/to/font-from-package
 </file>
 
-<file path="lib/logic/bloc/timer/timer_state.dart">
-part of 'timer_bloc.dart';
-
-class TimerState extends Equatable {
-  final List<WorkoutStage> stages;
-  final int currentStageIndex;
-  final Duration elapsed;
-  final bool isRunning;
-  final bool isPrep; // <--- NEW: Tracks if we are in "Get Ready" mode
-
-  const TimerState({
-    required this.stages,
-    required this.currentStageIndex,
-    required this.elapsed,
-    required this.isRunning,
-    this.isPrep = true, // Default to true so workout starts with "Get Ready"
-  });
-
-  factory TimerState.initial(List<WorkoutStage> stages) {
-    return TimerState(
-      stages: stages,
-      currentStageIndex: 0,
-      elapsed: Duration.zero,
-      isRunning: false,
-      isPrep: true, // Start with prep
-    );
-  }
-
-  TimerState copyWith({List<WorkoutStage>? stages, int? currentStageIndex, Duration? elapsed, bool? isRunning, bool? isPrep}) {
-    return TimerState(stages: stages ?? this.stages, currentStageIndex: currentStageIndex ?? this.currentStageIndex, elapsed: elapsed ?? this.elapsed, isRunning: isRunning ?? this.isRunning, isPrep: isPrep ?? this.isPrep);
-  }
-
-  // Helpers
-  WorkoutStage get currentStage => stages[currentStageIndex];
-  bool get isLastStage => currentStageIndex >= stages.length - 1;
-  // Finished only if it's the last stage AND we are done with work (not prep)
-  bool get isFinished => isLastStage && !isPrep && elapsed >= currentStage.duration;
-
-  @override
-  List<Object?> get props => [stages, currentStageIndex, elapsed, isRunning, isPrep];
-}
-</file>
-
-<file path="lib/presentation/screens/workout/workout_page.dart">
-import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:mars_workout_app/core/constants/enums/workout_type.dart';
-import 'package:mars_workout_app/core/services/audio_service.dart';
-import 'package:mars_workout_app/data/models/workout_model.dart';
-import 'package:mars_workout_app/data/repositories/workouts/workout_repository.dart';
-import 'package:mars_workout_app/logic/bloc/plan/plan_bloc.dart';
-import 'package:mars_workout_app/logic/bloc/timer/timer_bloc.dart';
-import 'package:mars_workout_app/logic/cubit/workout_video_cubit.dart';
-import 'package:mars_workout_app/presentation/screens/workout/completion/workout_completion_screen.dart';
-import 'package:mars_workout_app/presentation/screens/workout/workout_screen.dart';
-
-class WorkoutPage extends StatelessWidget {
-  final Workout workout;
-  final String planDayId;
-  final WorkoutType workoutType;
-
-  const WorkoutPage({super.key, required this.workout, required this.planDayId, required this.workoutType});
-
-  @override
-  Widget build(BuildContext context) {
-    // Cache plans once to avoid repeated expensive calls
-    final allPlans = WorkoutRepository().getAllPlans();
-
-    return MultiBlocProvider(
-      providers: [
-        BlocProvider<TimerBloc>(create: (context) => TimerBloc(workout.stages)..add(StartTimer())),
-        BlocProvider<WorkoutVideoCubit>(create: (_) => WorkoutVideoCubit()),
-      ],
-      child: BlocListener<TimerBloc, TimerState>(
-        listener: (context, state) {
-          // 2. Workout Finished Logic
-          if (state.isFinished) {
-            context.read<PlanBloc>().add(MarkDayAsCompleted(planDayId));
-
-            final planBlocState = context.read<PlanBloc>().state;
-            final completedIds = Set<String>.from(planBlocState.completedDayIds);
-            completedIds.add(planDayId);
-
-            bool isWeekFinished = false;
-            bool isPlanFinished = false;
-
-            // --- FIX: Get the active plan ID for THIS workout type ---
-            String? activePlanId = planBlocState.activePlans[workoutType.toString()];
-
-            if (activePlanId != null) {
-              try {
-                final currentPlan = allPlans.firstWhere((p) => p.id == activePlanId);
-
-                isPlanFinished = currentPlan.weeks.every((week) => week.days.every((day) => completedIds.contains(day.id)));
-
-                if (!isPlanFinished) {
-                  for (var week in currentPlan.weeks) {
-                    if (week.days.any((d) => d.id == planDayId)) {
-                      isWeekFinished = week.days.every((d) => completedIds.contains(d.id));
-                      break;
-                    }
-                  }
-                  if (isWeekFinished) {
-                    SoundService().playWeekComplete();
-                  } else {
-                    SoundService().playWorkoutComplete();
-                  }
-                } else {
-                  SoundService().playTrainingPlanComplete();
-                }
-              } catch (e) {
-                print("Plan lookup error: $e");
-              }
-            }
-
-            int totalMins = 0;
-            for (var s in workout.stages) {
-              totalMins += s.duration.inMinutes;
-            }
-
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(
-                builder: (_) => WorkoutCompletedScreen(workoutTitle: workout.title, totalMinutes: totalMins, isWeekComplete: isWeekFinished, isPlanComplete: isPlanFinished),
-              ),
-            );
-          }
-        },
-
-        child: WorkoutScreen(workout: workout, planDayId: planDayId, workoutType: workoutType),
-      ),
-    );
-  }
-}
-</file>
-
-<file path="lib/presentation/screens/workout/workout_screen.dart">
-import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:cached_network_image/cached_network_image.dart';
-import 'package:mars_workout_app/core/constants/enums/workout_type.dart';
-import 'package:mars_workout_app/data/models/workout_model.dart';
-import 'package:mars_workout_app/data/repositories/misc/gif_repository.dart';
-import 'package:mars_workout_app/logic/bloc/timer/timer_bloc.dart';
-import 'package:mars_workout_app/presentation/screens/workout/widgets/stage_info/stage_info_and_segment_bar.dart';
-import 'package:mars_workout_app/presentation/screens/workout/widgets/timer/linear_timer_display.dart';
-import 'package:mars_workout_app/presentation/screens/workout/widgets/timer/prep_overlay.dart'; // Import this
-import 'package:mars_workout_app/presentation/screens/workout/widgets/timer/timer_widget.dart';
-import 'package:mars_workout_app/presentation/screens/workout/widgets/workout_video_player.dart';
-import 'package:wakelock_plus/wakelock_plus.dart';
-
-class WorkoutScreen extends StatefulWidget {
-  final WorkoutType workoutType;
-  final Workout workout;
-  final String planDayId;
-
-  const WorkoutScreen({super.key, required this.workout, required this.planDayId, required this.workoutType});
-
-  @override
-  State<WorkoutScreen> createState() => _WorkoutScreenState();
-}
-
-class _WorkoutScreenState extends State<WorkoutScreen> {
-  static const Duration _youtubeThreshold = Duration(minutes: 10);
-  @override
-  void initState() {
-    super.initState();
-    WakelockPlus.enable();
-  }
-
-  void _preloadNextGif(BuildContext context, int currentIndex) {
-    if (!mounted) return;
-    if (currentIndex < widget.workout.stages.length - 1) {
-      final nextStage = widget.workout.stages[currentIndex + 1];
-      final nextGifUrl = GifRepository.getGifUrl(widget.workoutType, nextStage.name);
-      // Preload the next GIF
-      precacheImage(NetworkImage(nextGifUrl), context);
-    }
-  }
-
-  @override
-  void dispose() {
-    WakelockPlus.disable();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final totalDuration = widget.workout.stages.fold(Duration.zero, (prev, element) => prev + element.duration);
-    final useYoutube = totalDuration > _youtubeThreshold;
-
-    return Scaffold(
-      appBar: AppBar(title: Text(widget.workout.title), elevation: 0, foregroundColor: Colors.black),
-      body: Stack(
-        children: [
-          // 1. Main workout UI
-          Column(
-            children: [
-              Expanded(
-                flex: 4,
-                child: RepaintBoundary(
-                  child: useYoutube
-                      ? WorkoutVideoSection(
-                          workout: widget.workout,
-                          planDayId: widget.planDayId,
-                          workoutType: widget.workoutType,
-                        )
-                      : BlocBuilder<TimerBloc, TimerState>(
-                          buildWhen: (previous, current) => previous.currentStageIndex != current.currentStageIndex,
-                          builder: (context, state) {
-                            final gifUrl = GifRepository.getGifUrl(widget.workoutType, state.currentStage.name);
-
-                            // Preload next stage GIF when stage changes
-                            WidgetsBinding.instance.addPostFrameCallback((_) {
-                              _preloadNextGif(context, state.currentStageIndex);
-                            });
-
-                            return Container(
-                              width: double.infinity,
-                              color: Colors.grey.shade100,
-                              child: CachedNetworkImage(
-                                imageUrl: gifUrl,
-                                fit: BoxFit.contain,
-                                placeholder: (context, url) => Center(child: CircularProgressIndicator(color: theme.primaryColor)),
-                                errorWidget: (context, url, error) => Center(child: Icon(Icons.fitness_center, size: 64, color: Colors.grey.shade100)),
-                                memCacheWidth: 800,
-                                memCacheHeight: 800,
-                              ),
-                            );
-                          },
-                        ),
-                ),
-              ),
-              Expanded(
-                flex: 6,
-                child: Container(
-                  padding: const EdgeInsets.fromLTRB(24, 32, 24, 24),
-                  clipBehavior: Clip.antiAlias,
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.surface,
-                    borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
-                    boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 20, offset: const Offset(0, -5))],
-                  ),
-                  child: const Column(children: [StageInfoAndSegmentBar(), Spacer(), LinearTimerDisplay(), SizedBox(height: 16), TimerControls()]),
-                ),
-              ),
-            ],
-          ),
-
-          // 2. PREP OVERLAY (Top Layer)
-          const PrepOverlay(),
-        ],
-      ),
-    );
-  }
-}
-</file>
-
 <file path="lib/data/models/workout_model.dart">
 import 'package:equatable/equatable.dart';
 
@@ -10147,6 +10594,204 @@ final class PlanState extends Equatable {
 }
 </file>
 
+<file path="lib/logic/bloc/timer/timer_state.dart">
+part of 'timer_bloc.dart';
+
+class TimerState extends Equatable {
+  final List<WorkoutStage> stages;
+  final int currentStageIndex;
+  final Duration elapsed;
+  final bool isRunning;
+
+  const TimerState({
+    required this.stages,
+    required this.currentStageIndex,
+    required this.elapsed,
+    required this.isRunning,
+  });
+
+  factory TimerState.initial(List<WorkoutStage> stages) {
+    return TimerState(
+      stages: stages,
+      currentStageIndex: 0,
+      elapsed: Duration.zero,
+      isRunning: false,
+    );
+  }
+
+  TimerState copyWith({List<WorkoutStage>? stages, int? currentStageIndex, Duration? elapsed, bool? isRunning}) {
+    return TimerState(
+      stages: stages ?? this.stages, 
+      currentStageIndex: currentStageIndex ?? this.currentStageIndex, 
+      elapsed: elapsed ?? this.elapsed, 
+      isRunning: isRunning ?? this.isRunning,
+    );
+  }
+
+  // Helpers
+  WorkoutStage get currentStage => stages[currentStageIndex];
+  bool get isLastStage => currentStageIndex >= stages.length - 1;
+  bool get isFinished => isLastStage && elapsed >= currentStage.duration;
+
+  @override
+  List<Object?> get props => [stages, currentStageIndex, elapsed, isRunning];
+}
+</file>
+
+<file path="lib/presentation/screens/workout/workout_page.dart">
+import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:mars_workout_app/core/constants/enums/workout_type.dart';
+import 'package:mars_workout_app/core/services/audio_service.dart';
+import 'package:mars_workout_app/data/models/workout_model.dart';
+import 'package:mars_workout_app/data/models/workout_session.dart';
+import 'package:mars_workout_app/data/repositories/workouts/workout_repository.dart';
+import 'package:mars_workout_app/logic/bloc/plan/plan_bloc.dart';
+import 'package:mars_workout_app/logic/bloc/timer/timer_bloc.dart';
+import 'package:mars_workout_app/logic/bloc/workout_session/workout_session_bloc.dart';
+import 'package:mars_workout_app/presentation/screens/workout/completion/workout_completion_screen.dart';
+import 'package:mars_workout_app/presentation/screens/workout/workout_screen.dart';
+
+class WorkoutPage extends StatefulWidget {
+  final Workout workout;
+  final String planDayId;
+  final WorkoutType workoutType;
+
+  const WorkoutPage({super.key, required this.workout, required this.planDayId, required this.workoutType});
+
+  @override
+  State<WorkoutPage> createState() => _WorkoutPageState();
+}
+
+class _WorkoutPageState extends State<WorkoutPage> with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    
+    // Save workout state when app goes to background or paused
+    if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive) {
+      _saveWorkoutSession();
+    }
+  }
+
+  void _saveWorkoutSession() {
+    final timerState = context.read<TimerBloc>().state;
+    
+    // Only save if workout is not finished
+    if (!timerState.isFinished) {
+      final session = WorkoutSession(
+        workout: widget.workout,
+        planDayId: widget.planDayId,
+        workoutType: widget.workoutType,
+        currentStageIndex: timerState.currentStageIndex,
+        elapsed: timerState.elapsed,
+        isRunning: timerState.isRunning,
+        savedAt: DateTime.now(),
+      );
+      
+      context.read<WorkoutSessionBloc>().add(SaveWorkoutSession(session));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Cache plans once to avoid repeated expensive calls
+    final allPlans = WorkoutRepository().getAllPlans();
+
+    return MultiBlocListener(
+        listeners: [
+          // Save workout state periodically during workout
+          BlocListener<TimerBloc, TimerState>(
+            listenWhen: (previous, current) {
+              // Save every 5 seconds or when stage changes
+              return current.elapsed.inSeconds % 5 == 0 || 
+                     previous.currentStageIndex != current.currentStageIndex;
+            },
+            listener: (context, state) {
+              if (!state.isFinished) {
+                _saveWorkoutSession();
+              }
+            },
+          ),
+          // Handle workout completion
+          BlocListener<TimerBloc, TimerState>(
+            listener: (context, state) {
+              // 2. Workout Finished Logic
+              if (state.isFinished) {
+            // Clear the saved session since workout is complete
+            context.read<WorkoutSessionBloc>().add(const ClearWorkoutSession());
+            
+            context.read<PlanBloc>().add(MarkDayAsCompleted(widget.planDayId));
+
+            final planBlocState = context.read<PlanBloc>().state;
+            final completedIds = Set<String>.from(planBlocState.completedDayIds);
+            completedIds.add(widget.planDayId);
+
+            bool isWeekFinished = false;
+            bool isPlanFinished = false;
+
+            // --- FIX: Get the active plan ID for THIS workout type ---
+            String? activePlanId = planBlocState.activePlans[widget.workoutType.toString()];
+
+            if (activePlanId != null) {
+              try {
+                final currentPlan = allPlans.firstWhere((p) => p.id == activePlanId);
+
+                isPlanFinished = currentPlan.weeks.every((week) => week.days.every((day) => completedIds.contains(day.id)));
+
+                if (!isPlanFinished) {
+                  for (var week in currentPlan.weeks) {
+                    if (week.days.any((d) => d.id == widget.planDayId)) {
+                      isWeekFinished = week.days.every((d) => completedIds.contains(d.id));
+                      break;
+                    }
+                  }
+                  if (isWeekFinished) {
+                    SoundService().playWeekComplete();
+                  } else {
+                    SoundService().playWorkoutComplete();
+                  }
+                } else {
+                  SoundService().playTrainingPlanComplete();
+                }
+              } catch (e) {
+                print("Plan lookup error: $e");
+              }
+            }
+
+            int totalMins = 0;
+            for (var s in widget.workout.stages) {
+              totalMins += s.duration.inMinutes;
+            }
+
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (_) => WorkoutCompletedScreen(workoutTitle: widget.workout.title, totalMinutes: totalMins, isWeekComplete: isWeekFinished, isPlanComplete: isPlanFinished),
+              ),
+            );
+              }
+            },
+          ),
+      ],
+      child: WorkoutScreen(workout: widget.workout, planDayId: widget.planDayId, workoutType: widget.workoutType),
+    );
+  }
+}
+</file>
+
 <file path="lib/logic/bloc/timer/timer_bloc.dart">
 import 'dart:async';
 import 'package:equatable/equatable.dart';
@@ -10164,6 +10809,7 @@ class TimerBloc extends Bloc<TimerEvent, TimerState> {
     on<PauseTimer>(_onPauseTimer);
     on<ResetTimer>(_onResetTimer);
     on<NextStage>(_onNextStage);
+    on<RestoreTimer>(_onRestoreTimer);
     on<TimerTicked>(_onTimerTicked);
   }
 
@@ -10192,24 +10838,16 @@ class TimerBloc extends Bloc<TimerEvent, TimerState> {
     emit(TimerState.initial(state.stages));
   }
 
-  // Inside _onTimerTicked method:
+  void _onRestoreTimer(RestoreTimer event, Emitter<TimerState> emit) {
+    _tickerSubscription?.cancel();
+    emit(state.copyWith(
+      currentStageIndex: event.currentStageIndex,
+      elapsed: event.elapsed,
+      isRunning: false, // Start paused
+    ));
+  }
 
   void _onTimerTicked(TimerTicked event, Emitter<TimerState> emit) {
-    final int prepDurationSeconds = (state.currentStageIndex > 0) ? 10 : 5; // 5 Seconds "Get Ready" time
-
-    // 1. Handle "Get Ready" Phase
-    if (state.isPrep) {
-      if (state.elapsed.inSeconds >= prepDurationSeconds) {
-        // Prep is done! Switch to Work.
-        emit(state.copyWith(isPrep: false, elapsed: Duration.zero));
-      } else {
-        // Continue Prep countdown
-        emit(state.copyWith(elapsed: event.elapsed));
-      }
-      return;
-    }
-
-    // 2. Handle "Work" Phase
     if (event.elapsed >= state.currentStage.duration) {
       add(NextStage());
     } else {
@@ -10217,9 +10855,8 @@ class TimerBloc extends Bloc<TimerEvent, TimerState> {
     }
   }
 
-  // Inside _onNextStage method:
   void _onNextStage(NextStage event, Emitter<TimerState> emit) {
-    // 1. Check if workout is finished
+    // Check if workout is finished
     if (state.isLastStage) {
       _tickerSubscription?.cancel();
       // Force elapsed to duration so UI shows 100% complete before navigating
@@ -10227,68 +10864,11 @@ class TimerBloc extends Bloc<TimerEvent, TimerState> {
       return;
     }
 
-    // 2. Identify the next stage
-    final nextIndex = state.currentStageIndex + 1;
-    final nextStage = state.stages[nextIndex];
-
-    // 3. Check if the next stage is a "Rest" stage
-    // We check for "rest" or "recover" to be safe
-    final isRestStage = nextStage.name.toLowerCase().contains('rest') || nextStage.name.toLowerCase().contains('recover') || nextStage.name.toLowerCase().contains('cool');
-
-    // 4. Transition
+    // Move to next stage
     emit(
       state.copyWith(
-        currentStageIndex: nextIndex,
+        currentStageIndex: state.currentStageIndex + 1,
         elapsed: Duration.zero,
-        // If it is a rest stage, SKIP prep (isPrep = false).
-        // Otherwise, show prep (isPrep = true).
-        isPrep: !isRestStage,
-      ),
-    );
-  }
-}
-</file>
-
-<file path="lib/presentation/app/main.dart">
-import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:hydrated_bloc/hydrated_bloc.dart';
-import 'package:mars_workout_app/core/services/audio_service.dart';
-import 'package:mars_workout_app/core/theme/app_theme.dart';
-import 'package:mars_workout_app/presentation/screens/home_screen/home_page.dart';
-import 'package:path_provider/path_provider.dart';
-import '../../logic/bloc/plan/plan_bloc.dart';
-
-void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  await SystemChrome.setPreferredOrientations([
-    DeviceOrientation.portraitUp,
-    DeviceOrientation.portraitDown,
-  ]);
-  await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
-
-  // 2. MAKE SYSTEM BARS TRANSPARENT
-  SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(statusBarColor: Colors.transparent, statusBarIconBrightness: Brightness.dark, systemNavigationBarColor: Colors.transparent, systemNavigationBarIconBrightness: Brightness.dark));
-  HydratedBloc.storage = await HydratedStorage.build(storageDirectory: await getApplicationDocumentsDirectory());
-  await SoundService().init();
-  runApp(const MyApp());
-}
-
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return BlocProvider(
-      create: (_) => PlanBloc(),
-      child: MaterialApp(
-        title: 'Workout Planner',
-        darkTheme: AppTheme.lightTheme,
-        theme: AppTheme.lightTheme,
-        debugShowCheckedModeBanner: false,
-        home: const HomePage(),
-        // Define your routes for timer/details here...
       ),
     );
   }
@@ -10328,6 +10908,301 @@ class HomeScreen extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+</file>
+
+<file path="lib/presentation/screens/workout/workout_screen.dart">
+import 'dart:ui';
+import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:mars_workout_app/core/constants/enums/workout_type.dart';
+import 'package:mars_workout_app/data/models/workout_helper.dart';
+import 'package:mars_workout_app/data/models/workout_model.dart';
+import 'package:mars_workout_app/data/models/workout_session.dart';
+import 'package:mars_workout_app/data/repositories/misc/gif_repository.dart';
+import 'package:mars_workout_app/logic/bloc/timer/timer_bloc.dart';
+import 'package:mars_workout_app/logic/bloc/workout_session/workout_session_bloc.dart';
+import 'package:mars_workout_app/presentation/screens/workout/widgets/stage_info/stage_info_and_segment_bar.dart';
+import 'package:mars_workout_app/presentation/screens/workout/widgets/timer/linear_timer_display.dart';
+import 'package:mars_workout_app/presentation/screens/workout/widgets/timer/timer_widget.dart';
+import 'package:mars_workout_app/presentation/screens/workout/widgets/workout_video_player.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
+
+class WorkoutScreen extends StatefulWidget {
+  final WorkoutType workoutType;
+  final Workout workout;
+  final String planDayId;
+
+  const WorkoutScreen({super.key, required this.workout, required this.planDayId, required this.workoutType});
+
+  @override
+  State<WorkoutScreen> createState() => _WorkoutScreenState();
+}
+
+class _WorkoutScreenState extends State<WorkoutScreen> {
+  static const Duration _youtubeThreshold = Duration(minutes: 10);
+  @override
+  void initState() {
+    super.initState();
+    WakelockPlus.enable();
+  }
+
+  void _preloadNextGif(BuildContext context, int currentIndex) {
+    if (!mounted) return;
+    if (currentIndex < widget.workout.stages.length - 1) {
+      final nextStage = widget.workout.stages[currentIndex + 1];
+      final nextGifUrl = GifRepository.getGifUrl(widget.workoutType, nextStage.name);
+      // Preload the next GIF
+      precacheImage(NetworkImage(nextGifUrl), context);
+    }
+  }
+
+  @override
+  void dispose() {
+    WakelockPlus.disable();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final totalDuration = widget.workout.stages.fold(Duration.zero, (prev, element) => prev + element.duration);
+    final useYoutube = totalDuration > _youtubeThreshold;
+
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
+        
+        // Save workout state before exiting
+        final timerState = context.read<TimerBloc>().state;
+        if (!timerState.isFinished) {
+          final shouldExit = await _showExitConfirmation(context);
+          if (shouldExit == true) {
+            // Save the session
+            final session = WorkoutSession(
+              workout: widget.workout,
+              planDayId: widget.planDayId,
+              workoutType: widget.workoutType,
+              currentStageIndex: timerState.currentStageIndex,
+              elapsed: timerState.elapsed,
+              isRunning: timerState.isRunning,
+              savedAt: DateTime.now(),
+            );
+            context.read<WorkoutSessionBloc>().add(SaveWorkoutSession(session));
+            if (context.mounted) {
+              Navigator.of(context).pop();
+            }
+          }
+        } else {
+          Navigator.of(context).pop();
+        }
+      },
+      child: Scaffold(
+        resizeToAvoidBottomInset: true,
+        appBar: AppBar(title: Text(widget.workout.title), elevation: 0, foregroundColor: Colors.black),
+        body: LayoutBuilder(
+          builder: (context, constraints) {
+            return SingleChildScrollView(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                child: IntrinsicHeight(
+                  child: Column(
+                    children: [
+                      SizedBox(
+                        height: constraints.maxHeight * 0.4,
+                        child: RepaintBoundary(
+                          child: useYoutube
+                              ? WorkoutVideoSection(
+                                  workout: widget.workout,
+                                  planDayId: widget.planDayId,
+                                  workoutType: widget.workoutType,
+                                )
+                              : BlocBuilder<TimerBloc, TimerState>(
+                                  buildWhen: (previous, current) => previous.currentStageIndex != current.currentStageIndex,
+                                  builder: (context, state) {
+                                    // Check if current stage is a countdown
+                                    final isCountdown = WorkoutHelper.isCountdownStage(state.currentStage);
+                                    
+                                    if (isCountdown) {
+                                      // Show countdown overlay for "Get Ready" stages
+                                      return _buildCountdownOverlay(context, state);
+                                    }
+                                    
+                                    final gifUrl = GifRepository.getGifUrl(widget.workoutType, state.currentStage.name);
+
+                                    // Preload next stage GIF when stage changes
+                                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                                      _preloadNextGif(context, state.currentStageIndex);
+                                    });
+
+                                    return Container(
+                                      width: double.infinity,
+                                      color: Colors.grey.shade100,
+                                      child: CachedNetworkImage(
+                                        imageUrl: gifUrl,
+                                        fit: BoxFit.contain,
+                                        placeholder: (context, url) => Center(child: CircularProgressIndicator(color: theme.primaryColor)),
+                                        errorWidget: (context, url, error) => Center(child: Icon(Icons.fitness_center, size: 64, color: Colors.grey.shade100)),
+                                        memCacheWidth: 800,
+                                        memCacheHeight: 800,
+                                      ),
+                                    );
+                                  },
+                                ),
+                        ),
+                      ),
+                      Expanded(
+                        child: Container(
+                          padding: const EdgeInsets.fromLTRB(24, 32, 24, 24),
+                          clipBehavior: Clip.antiAlias,
+                          decoration: BoxDecoration(
+                            color: theme.colorScheme.surface,
+                            borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
+                            boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 20, offset: const Offset(0, -5))],
+                          ),
+                          child: const Column(
+                            children: [
+                              StageInfoAndSegmentBar(),
+                              Spacer(),
+                              LinearTimerDisplay(),
+                              SizedBox(height: 16),
+                              TimerControls(),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCountdownOverlay(BuildContext context, TimerState state) {
+    final theme = Theme.of(context);
+    final timeLeft = state.currentStage.duration - state.elapsed;
+    final secondsDisplay = timeLeft.inSeconds < 0 ? 0 : timeLeft.inSeconds;
+    final progress = state.currentStage.duration.inMilliseconds > 0 
+        ? state.elapsed.inMilliseconds / state.currentStage.duration.inMilliseconds 
+        : 0.0;
+
+    return Container(
+      color: Colors.black.withValues(alpha: 0.9),
+      width: double.infinity,
+      height: double.infinity,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(
+            "GET READY",
+            style: theme.textTheme.headlineMedium?.copyWith(
+              color: Colors.orange,
+              fontWeight: FontWeight.bold,
+              letterSpacing: 3.0,
+            ),
+          ),
+          const SizedBox(height: 40),
+          // Big Circular Countdown
+          SizedBox(
+            width: 200,
+            height: 200,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                // Background Circle
+                SizedBox.expand(
+                  child: CircularProgressIndicator(
+                    value: 1.0,
+                    strokeWidth: 15,
+                    color: Colors.white.withValues(alpha: 0.1),
+                  ),
+                ),
+                // Animated Foreground Circle
+                SizedBox.expand(
+                  child: TweenAnimationBuilder<double>(
+                    key: ValueKey(state.currentStageIndex),
+                    tween: Tween<double>(begin: 0.0, end: progress),
+                    duration: const Duration(milliseconds: 1000),
+                    builder: (context, value, _) => CircularProgressIndicator(
+                      value: value,
+                      strokeWidth: 15,
+                      color: Colors.orange,
+                      strokeCap: StrokeCap.round,
+                    ),
+                  ),
+                ),
+                // The Number
+                Text(
+                  "$secondsDisplay",
+                  style: const TextStyle(
+                    fontSize: 90,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                    fontFeatures: [FontFeature.tabularFigures()],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 50),
+          // Next stage info
+          if (state.currentStage.description.isNotEmpty) ...[
+            Text(
+              "NEXT UP:",
+              style: theme.textTheme.labelLarge?.copyWith(
+                color: Colors.white54,
+                letterSpacing: 1.2,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 32.0),
+              child: Text(
+                state.currentStage.description.replaceFirst('Next: ', ''),
+                textAlign: TextAlign.center,
+                style: theme.textTheme.headlineSmall?.copyWith(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Future<bool?> _showExitConfirmation(BuildContext context) {
+    return showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('Exit Workout?'),
+        content: const Text(
+          'Your progress will be saved and you can resume this workout later.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: ElevatedButton.styleFrom(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            child: const Text('Exit & Save'),
+          ),
+        ],
       ),
     );
   }
@@ -10375,6 +11250,92 @@ class GifRepository {
       return 'https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExaWg3aXIwcHEwNzBpN2J6MGw2OWl0eDh1cWc5NXE1bDRsMGg4anV3byZlcD12MV9naWZzX3NlYXJjaCZjdD1n/2grhtvGDP6uC7dIyw4/giphy.gif';
     }
     return 'https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExOHltdTdpYXhidDZ5ejhyMnp3M3JxdWpyYmNxajA4bGp5bDRrbGp3aCZlcD12MV9naWZzX3NlYXJjaCZjdD1n/YWqlvTcGnT6JN0ZggR/giphy.gif';
+  }
+}
+</file>
+
+<file path="lib/presentation/app/main.dart">
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:hydrated_bloc/hydrated_bloc.dart';
+import 'package:mars_workout_app/core/services/audio_service.dart';
+import 'package:mars_workout_app/core/theme/app_theme.dart';
+import 'package:mars_workout_app/presentation/screens/home_screen/home_page.dart';
+import 'package:mars_workout_app/presentation/widgets/resume_workout_dialog.dart';
+import 'package:path_provider/path_provider.dart';
+import '../../logic/bloc/plan/plan_bloc.dart';
+import '../../logic/bloc/workout_session/workout_session_bloc.dart';
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await SystemChrome.setPreferredOrientations([
+    DeviceOrientation.portraitUp,
+    DeviceOrientation.portraitDown,
+  ]);
+  await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+
+  // 2. MAKE SYSTEM BARS TRANSPARENT
+  SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(statusBarColor: Colors.transparent, statusBarIconBrightness: Brightness.dark, systemNavigationBarColor: Colors.transparent, systemNavigationBarIconBrightness: Brightness.dark));
+  HydratedBloc.storage = await HydratedStorage.build(storageDirectory: await getApplicationDocumentsDirectory());
+  await SoundService().init();
+  runApp(const MyApp());
+}
+
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return MultiBlocProvider(
+      providers: [
+        BlocProvider(create: (_) => PlanBloc()),
+        BlocProvider(create: (_) => WorkoutSessionBloc()),
+      ],
+      child: MaterialApp(
+        title: 'Workout Planner',
+        darkTheme: AppTheme.lightTheme,
+        theme: AppTheme.lightTheme,
+        debugShowCheckedModeBanner: false,
+        home: const HomePageWithResumeCheck(),
+        // Define your routes for timer/details here...
+      ),
+    );
+  }
+}
+
+/// Wrapper that checks for saved workout sessions on startup
+class HomePageWithResumeCheck extends StatefulWidget {
+  const HomePageWithResumeCheck({super.key});
+
+  @override
+  State<HomePageWithResumeCheck> createState() => _HomePageWithResumeCheckState();
+}
+
+class _HomePageWithResumeCheckState extends State<HomePageWithResumeCheck> {
+  @override
+  void initState() {
+    super.initState();
+    // Check for saved workout session after the first frame
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkForSavedWorkout();
+    });
+  }
+
+  void _checkForSavedWorkout() {
+    final sessionState = context.read<WorkoutSessionBloc>().state;
+    if (sessionState.hasSession && sessionState.session != null) {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => ResumeWorkoutDialog(session: sessionState.session!),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return const HomePage();
   }
 }
 </file>

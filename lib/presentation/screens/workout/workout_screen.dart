@@ -1,5 +1,6 @@
-import 'dart:ui';
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:mars_workout_app/core/constants/enums/workout_type.dart';
@@ -26,12 +27,40 @@ class WorkoutScreen extends StatefulWidget {
   State<WorkoutScreen> createState() => _WorkoutScreenState();
 }
 
-class _WorkoutScreenState extends State<WorkoutScreen> {
+class _WorkoutScreenState extends State<WorkoutScreen> with WidgetsBindingObserver {
   static const Duration _youtubeThreshold = Duration(minutes: 10);
+  static const platform = MethodChannel('com.example.mars_workout_app/pip');
+
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     WakelockPlus.enable();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    WakelockPlus.disable();
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Attempt to enter PiP when app is backgrounded
+    if (state == AppLifecycleState.paused) {
+      _enterPictureInPicture();
+    }
+  }
+
+  Future<void> _enterPictureInPicture() async {
+    if (Platform.isAndroid) {
+      try {
+        await platform.invokeMethod('enterPiP');
+      } on PlatformException catch (_) {
+        // PiP not supported on this device/version
+      }
+    }
   }
 
   void _preloadNextGif(BuildContext context, int currentIndex) {
@@ -39,19 +68,60 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
     if (currentIndex < widget.workout.stages.length - 1) {
       final nextStage = widget.workout.stages[currentIndex + 1];
       final nextGifUrl = GifRepository.getGifUrl(widget.workoutType, nextStage.name);
-      // Preload the next GIF
       precacheImage(NetworkImage(nextGifUrl), context);
     }
   }
 
   @override
-  void dispose() {
-    WakelockPlus.disable();
-    super.dispose();
+  Widget build(BuildContext context) {
+    // --- (b) PiP / Background Widget Detection ---
+    // If the window height is very small, we are likely in PiP mode.
+    final size = MediaQuery.of(context).size;
+    if (size.height < 300) {
+      return _buildPipLayout(context);
+    }
+
+    return _buildStandardLayout(context);
   }
 
-  @override
-  Widget build(BuildContext context) {
+  // --- (b) The simplified widget for background/PiP view ---
+  Widget _buildPipLayout(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: Center(
+        child: BlocBuilder<TimerBloc, TimerState>(
+          builder: (context, state) {
+            final isCountdown = WorkoutHelper.isCountdownStage(state.currentStage);
+            final maxDuration = state.currentStage.duration;
+            final remaining = maxDuration - state.elapsed;
+            final secondsDisplay = remaining.inSeconds < 0 ? 0 : remaining.inSeconds;
+
+            final textColor = isCountdown ? Colors.orange : Colors.white;
+
+            return Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  state.currentStage.name,
+                  style: TextStyle(color: textColor, fontSize: 14, fontWeight: FontWeight.bold),
+                  textAlign: TextAlign.center,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '${(secondsDisplay / 60).floor().toString().padLeft(2, '0')}:${(secondsDisplay % 60).toString().padLeft(2, '0')}',
+                  style: TextStyle(color: textColor, fontSize: 32, fontWeight: FontWeight.bold),
+                ),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStandardLayout(BuildContext context) {
     final theme = Theme.of(context);
     final totalDuration = widget.workout.stages.fold(Duration.zero, (prev, element) => prev + element.duration);
     final useYoutube = totalDuration > _youtubeThreshold;
@@ -60,13 +130,10 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
       canPop: false,
       onPopInvokedWithResult: (didPop, result) async {
         if (didPop) return;
-        
-        // Save workout state before exiting
         final timerState = context.read<TimerBloc>().state;
         if (!timerState.isFinished) {
           final shouldExit = await _showExitConfirmation(context);
           if (shouldExit == true) {
-            // Save the session
             final session = WorkoutSession(
               workout: widget.workout,
               planDayId: widget.planDayId,
@@ -101,48 +168,39 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
                         child: RepaintBoundary(
                           child: useYoutube
                               ? WorkoutVideoSection(
-                                  workout: widget.workout,
-                                  planDayId: widget.planDayId,
-                                  workoutType: widget.workoutType,
-                                )
+                            workout: widget.workout,
+                            planDayId: widget.planDayId,
+                            workoutType: widget.workoutType,
+                          )
                               : BlocBuilder<TimerBloc, TimerState>(
-                                  buildWhen: (previous, current) => previous.currentStageIndex != current.currentStageIndex,
-                                  builder: (context, state) {
-                                    // Check if current stage is a countdown
-                                    final isCountdown = WorkoutHelper.isCountdownStage(state.currentStage);
-                                    
-                                    if (isCountdown) {
-                                      // Show countdown overlay for "Get Ready" stages
-                                      return _buildCountdownOverlay(context, state);
-                                    }
-                                    
-                                    final gifUrl = GifRepository.getGifUrl(widget.workoutType, state.currentStage.name);
+                            buildWhen: (previous, current) => previous.currentStageIndex != current.currentStageIndex,
+                            builder: (context, state) {
+                              final isCountdown = WorkoutHelper.isCountdownStage(state.currentStage);
+                              if (isCountdown) {
+                                return _buildCountdownOverlay(context, state);
+                              }
+                              final gifUrl = GifRepository.getGifUrl(widget.workoutType, state.currentStage.name);
+                              WidgetsBinding.instance.addPostFrameCallback((_) => _preloadNextGif(context, state.currentStageIndex));
 
-                                    // Preload next stage GIF when stage changes
-                                    WidgetsBinding.instance.addPostFrameCallback((_) {
-                                      _preloadNextGif(context, state.currentStageIndex);
-                                    });
-
-                                    return Container(
-                                      width: double.infinity,
-                                      color: Colors.grey.shade100,
-                                      child: CachedNetworkImage(
-                                        imageUrl: gifUrl,
-                                        fit: BoxFit.contain,
-                                        placeholder: (context, url) => Center(child: CircularProgressIndicator(color: theme.primaryColor)),
-                                        errorWidget: (context, url, error) => Center(child: Icon(Icons.fitness_center, size: 64, color: Colors.grey.shade100)),
-                                        memCacheWidth: 800,
-                                        memCacheHeight: 800,
-                                      ),
-                                    );
-                                  },
+                              return Container(
+                                width: double.infinity,
+                                color: Colors.grey.shade100,
+                                child: CachedNetworkImage(
+                                  imageUrl: gifUrl,
+                                  fit: BoxFit.contain,
+                                  placeholder: (context, url) => Center(child: CircularProgressIndicator(color: theme.primaryColor)),
+                                  errorWidget: (context, url, error) => Center(child: Icon(Icons.fitness_center, size: 64, color: Colors.grey.shade100)),
+                                  memCacheWidth: 800,
+                                  memCacheHeight: 800,
                                 ),
+                              );
+                            },
+                          ),
                         ),
                       ),
                       Expanded(
                         child: Container(
                           padding: const EdgeInsets.fromLTRB(24, 32, 24, 24),
-                          clipBehavior: Clip.antiAlias,
                           decoration: BoxDecoration(
                             color: theme.colorScheme.surface,
                             borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
@@ -171,11 +229,13 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
   }
 
   Widget _buildCountdownOverlay(BuildContext context, TimerState state) {
+    // ... Keep your existing countdown overlay code exactly as it was ...
+    // Assuming standard implementation from previous Repomix context
     final theme = Theme.of(context);
     final timeLeft = state.currentStage.duration - state.elapsed;
     final secondsDisplay = timeLeft.inSeconds < 0 ? 0 : timeLeft.inSeconds;
-    final progress = state.currentStage.duration.inMilliseconds > 0 
-        ? state.elapsed.inMilliseconds / state.currentStage.duration.inMilliseconds 
+    final progress = state.currentStage.duration.inMilliseconds > 0
+        ? state.elapsed.inMilliseconds / state.currentStage.duration.inMilliseconds
         : 0.0;
 
     return Container(
@@ -185,79 +245,24 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Text(
-            "GET READY",
-            style: theme.textTheme.headlineMedium?.copyWith(
-              color: Colors.orange,
-              fontWeight: FontWeight.bold,
-              letterSpacing: 3.0,
-            ),
-          ),
+          Text("GET READY", style: theme.textTheme.headlineMedium?.copyWith(color: Colors.orange, fontWeight: FontWeight.bold, letterSpacing: 3.0)),
           const SizedBox(height: 40),
-          // Big Circular Countdown
           SizedBox(
-            width: 200,
-            height: 200,
+            width: 200, height: 200,
             child: Stack(
               alignment: Alignment.center,
               children: [
-                // Background Circle
-                SizedBox.expand(
-                  child: CircularProgressIndicator(
-                    value: 1.0,
-                    strokeWidth: 15,
-                    color: Colors.white.withValues(alpha: 0.1),
-                  ),
-                ),
-                // Animated Foreground Circle
-                SizedBox.expand(
-                  child: TweenAnimationBuilder<double>(
-                    key: ValueKey(state.currentStageIndex),
-                    tween: Tween<double>(begin: 0.0, end: progress),
-                    duration: const Duration(milliseconds: 1000),
-                    builder: (context, value, _) => CircularProgressIndicator(
-                      value: value,
-                      strokeWidth: 15,
-                      color: Colors.orange,
-                      strokeCap: StrokeCap.round,
-                    ),
-                  ),
-                ),
-                // The Number
-                Text(
-                  "$secondsDisplay",
-                  style: const TextStyle(
-                    fontSize: 90,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                    fontFeatures: [FontFeature.tabularFigures()],
-                  ),
-                ),
+                SizedBox.expand(child: CircularProgressIndicator(value: 1.0, strokeWidth: 15, color: Colors.white.withValues(alpha: 0.1))),
+                SizedBox.expand(child: TweenAnimationBuilder<double>(key: ValueKey(state.currentStageIndex), tween: Tween<double>(begin: 0.0, end: progress), duration: const Duration(milliseconds: 1000), builder: (context, value, _) => CircularProgressIndicator(value: value, strokeWidth: 15, color: Colors.orange, strokeCap: StrokeCap.round))),
+                Text("$secondsDisplay", style: const TextStyle(fontSize: 90, fontWeight: FontWeight.bold, color: Colors.white, fontFeatures: [FontFeature.tabularFigures()])),
               ],
             ),
           ),
           const SizedBox(height: 50),
-          // Next stage info
           if (state.currentStage.description.isNotEmpty) ...[
-            Text(
-              "NEXT UP:",
-              style: theme.textTheme.labelLarge?.copyWith(
-                color: Colors.white54,
-                letterSpacing: 1.2,
-              ),
-            ),
+            Text("NEXT UP:", style: theme.textTheme.labelLarge?.copyWith(color: Colors.white54, letterSpacing: 1.2)),
             const SizedBox(height: 12),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 32.0),
-              child: Text(
-                state.currentStage.description.replaceFirst('Next: ', ''),
-                textAlign: TextAlign.center,
-                style: theme.textTheme.headlineSmall?.copyWith(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
+            Padding(padding: const EdgeInsets.symmetric(horizontal: 32.0), child: Text(state.currentStage.description.replaceFirst('Next: ', ''), textAlign: TextAlign.center, style: theme.textTheme.headlineSmall?.copyWith(color: Colors.white, fontWeight: FontWeight.w600))),
           ],
         ],
       ),
@@ -270,19 +275,12 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: const Text('Exit Workout?'),
-        content: const Text(
-          'Your progress will be saved and you can resume this workout later.',
-        ),
+        content: const Text('Your progress will be saved and you can resume this workout later.'),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
-          ),
+          TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Cancel')),
           ElevatedButton(
             onPressed: () => Navigator.of(context).pop(true),
-            style: ElevatedButton.styleFrom(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            ),
+            style: ElevatedButton.styleFrom(shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
             child: const Text('Exit & Save'),
           ),
         ],
